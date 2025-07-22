@@ -1,0 +1,15 @@
+<default>
+	<prerequisites>
+		<tag type="extra" />
+	</prerequisites>
+		<info>
+			<author>Token, WXbet</author>
+			<name>MultiBootSelector</name>
+			<packagename>enigma2-plugin-extensions-multibootselector</packagename>
+			<shortdescription>MultiBootSelector</shortdescription>
+			<description>Basic python frontend for multiboot-selector.sh to simply select the slot to boot from.</description>
+		</info>
+	<files type="package">
+		<file type="package" name="enigma2-plugin-extensions-multibootselector" />
+	</files>
+</default>

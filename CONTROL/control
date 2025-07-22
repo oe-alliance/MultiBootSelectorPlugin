@@ -1,0 +1,10 @@
+Package: enigma2-plugin-extensions-multibootselector
+Version: 1.7
+Description: Basic python frontend for multiboot-selector.sh to simply select the slot to boot from.
+Architecture: all
+Section: extra
+Priority: optional
+Maintainer: OE-Alliance Team
+License: GPL-3.0
+Homepage: www.opena.tv
+Source: https://github.com/oe-alliance/MuliBootSelector
