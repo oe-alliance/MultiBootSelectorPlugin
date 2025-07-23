@@ -6,6 +6,7 @@
 #                                       #
 #########################################
 
+from . import PV, PN, PD
 from Screens.Screen import Screen
 from Screens.MessageBox import MessageBox
 from Screens.Console import Console
@@ -15,7 +16,12 @@ from Components.ActionMap import ActionMap
 from Components.Button import Button
 from Components.Label import Label
 from Screens.Standby import TryQuitMainloop
-from . import PV, PN, PD
+
+try:
+	from Components.SystemInfo import BoxInfo
+	PLUGIN_LOAD = BoxInfo.getItem("HasChkrootMultiboot") is None
+except:
+	PLUGIN_LOAD = True
 
 from os.path import join, isfile
 from subprocess import PIPE, Popen
@@ -26,7 +32,7 @@ def Plugins(**kwargs):
 	return [
 		PluginDescriptor(name=PN, icon="plugin.png", description=_(PD), where=[PluginDescriptor.WHERE_PLUGINMENU, PluginDescriptor.WHERE_EXTENSIONSMENU], fnc=main),
 		PluginDescriptor(name=PN, description=_(PD), where=[PluginDescriptor.WHERE_MENU], fnc=menuHook)
-	]
+	] if PLUGIN_LOAD else []
 
 
 def menuHook(menuid, **kwargs):
