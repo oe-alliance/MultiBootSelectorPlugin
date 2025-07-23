@@ -57,6 +57,7 @@ class Scripts(Screen):
 		self.session = session
 		self.cmd = "/usr/bin/multiboot-selector.sh"
 		self.slist = []
+		self.currentIndex = 0
 		self.output_lines = []
 		self.reload_list()
 		self["list"] = MenuList([item[1] for item in self.slist])
@@ -80,6 +81,7 @@ class Scripts(Screen):
 
 		self.updateButtons()
 		self["list"].onSelectionChanged.append(self.updateButtons)
+		self.onLayoutFinish.append(self.selectCurrentLine)
 
 
 	def run(self):
@@ -112,12 +114,18 @@ class Scripts(Screen):
 						entries = line.split()
 						image = " ".join(entries[2:])
 						self.slist.append([entries[0].split(")")[0] if "Empty" not in image else "-1" , "%s '%s' %s" % (entries[1], entries[0].split(")")[0], image)])
+						if line.endswith("Current"):
+							self.currentIndex = len(self.slist) - 1
 					self.output_lines.append(line)
 
 				if not self.slist:
 					self.slist = [[-1, "Error: %s" % self.output_lines[-1]]]
 		except Exception as e:
 			self.slist = [[-1, "Error: %s" % e]]
+
+
+	def selectCurrentLine(self):
+		self["list"].moveToIndex(self.currentIndex)
 
 
 	def updateButtons(self):
