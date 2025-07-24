@@ -1,0 +1,87 @@
+name: Build and Release Packages
+
+on:
+  push:
+    tags:
+      - '*'
+  workflow_dispatch:
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    env:
+      release_version: ${{ github.ref_name }}-r0
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up build environment
+        run: |
+          sudo apt update
+          sudo apt install -y fakeroot dpkg tar gzip xz-utils
+
+          # Prepare control file
+          sed "s/^Version: .*/Version: ${release_version}/" CONTROL/control > control
+
+          # Create postinst file
+          cat <<'EOF' > postinst
+          #!/bin/sh
+          set -e
+
+          if [ ! -x /usr/bin/multiboot-selector.sh ]; then
+            echo "WARNING: '/usr/bin/multiboot-selector.sh' does not exist or is not executable."
+            echo ""
+            echo "This file is a prerequisite for the MultiBoot Selector plugin to function."
+            echo "Please ensure that the 'multiboot-selector.sh' script is installed in /usr/bin"
+            echo "and is executable. Without it, this plugin will not work as intended."
+          fi
+
+          exit 0
+          EOF
+          chmod 755 postinst
+
+      # Build .deb package
+      - name: Build .deb package
+        run: |
+          mkdir -p deb_pkg/DEBIAN
+          mkdir -p deb_pkg/usr/lib/enigma2/python/Plugins/Extensions/MultiBootSelector
+
+          # Add files to publish
+          cp control postinst deb_pkg/DEBIAN/
+          cp src/*.py src/*.png deb_pkg/usr/lib/enigma2/python/Plugins/Extensions/MultiBootSelector/
+
+          # Create deb package
+          fakeroot dpkg-deb -Z xz --build deb_pkg enigma2-plugin-extensions-multibootselector_${release_version}_all.deb
+
+      # Build .ipk package
+      - name: Build .ipk package
+        run: |
+          mkdir -p ipk_pkg/control
+          mkdir -p ipk_pkg/usr/lib/enigma2/python/Plugins/Extensions/MultiBootSelector
+
+          # Add files to publish
+          cp control postinst ipk_pkg/control/
+          cp src/*.py src/*.png ipk_pkg/usr/lib/enigma2/python/Plugins/Extensions/MultiBootSelector/
+
+          # Create ipk package
+          cd ipk_pkg
+          tar -czvf control.tar.gz -C ./control .
+          tar -czvf data.tar.gz ./usr
+          echo "2.0" > debian-binary
+
+          ar r ../enigma2-plugin-extensions-multibootselector_${release_version}_all.ipk ./debian-binary ./control.tar.gz ./data.tar.gz
+          cd ..
+
+      # =============================
+      # ✅ Create GitHub Release with auto-generated release notes
+      # =============================
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            enigma2-plugin-extensions-multibootselector_*_all.deb
+            enigma2-plugin-extensions-multibootselector_*_all.ipk
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
