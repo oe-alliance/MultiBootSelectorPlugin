@@ -1,4 +1,4 @@
-name: Build and Release Packages
+name: Release
 
 on:
   push:
@@ -10,7 +10,7 @@ jobs:
   build-and-release:
     runs-on: ubuntu-latest
     env:
-      release_version: ${{ github.ref_name }}-r0
+      release_version: ${{ github.ref_name }}
 
     steps:
       - name: Checkout repository
@@ -52,7 +52,7 @@ jobs:
           cp src/*.py src/*.png deb_pkg/usr/lib/enigma2/python/Plugins/Extensions/MultiBootSelector/
 
           # Create deb package
-          fakeroot dpkg-deb -Z xz --build deb_pkg enigma2-plugin-extensions-multibootselector_${release_version}_all.deb
+          fakeroot dpkg-deb -Z xz --build deb_pkg enigma2-plugin-extensions-multibootselector_${release_version}-r0_all.deb
 
       # Build .ipk package
       - name: Build .ipk package
@@ -70,7 +70,7 @@ jobs:
           tar -czvf data.tar.gz ./usr
           echo "2.0" > debian-binary
 
-          ar r ../enigma2-plugin-extensions-multibootselector_${release_version}_all.ipk ./debian-binary ./control.tar.gz ./data.tar.gz
+          ar r ../enigma2-plugin-extensions-multibootselector_${release_version}-r0_all.ipk ./debian-binary ./control.tar.gz ./data.tar.gz
           cd ..
 
       # =============================
