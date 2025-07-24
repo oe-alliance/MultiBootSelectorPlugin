@@ -22,13 +22,13 @@ from Tools.Directories import fileExists, resolveFilename, SCOPE_SKIN_IMAGE
 try:
     from Components.SystemInfo import BoxInfo
     PLUGIN_LOAD = BoxInfo.getItem("HasChkrootMultiboot") is None
-except:
+except Exception:
     PLUGIN_LOAD = True
 
-from os.path import join, isfile
+from os.path import isfile
 from subprocess import PIPE, Popen
-from time import time, sleep
 from re import match
+
 
 def Plugins(**kwargs):
     return [
@@ -103,7 +103,6 @@ class Scripts(Screen):
         self["list"].onSelectionChanged.append(self.updateButtons)
         self.onLayoutFinish.append(self.onLayoutFinished)
 
-
     def run(self):
         slot_name = self["list"].getCurrent()
         slot_idx = next((str(sublist[0]) for sublist in self.slist if sublist[1] == slot_name), -1)
@@ -115,7 +114,6 @@ class Scripts(Screen):
             self.session.open(TryQuitMainloop, 2)
 
         self.session.openWithCallback(finished_run, Console, slot_name, cmdlist=[slot_cmd], closeOnSuccess=True)
-
 
     def reload_list(self):
         try:
@@ -132,7 +130,7 @@ class Scripts(Screen):
                     elif match(r'^.*\)\ Slot', line):
                         entries = line.split()
                         image = " ".join(entries[2:])
-                        self.slist.append([entries[0].split(")")[0] if "Empty" not in image else "-1" , "%s '%s' %s" % (entries[1], entries[0].split(")")[0], image)])
+                        self.slist.append([entries[0].split(")")[0] if "Empty" not in image else "-1", "%s '%s' %s" % (entries[1], entries[0].split(")")[0], image)])
                         if line.endswith("Current"):
                             self.currentIndex = len(self.slist) - 1
                     self.output_lines.append(line)
@@ -142,27 +140,26 @@ class Scripts(Screen):
         except Exception as e:
             self.slist = [[-1, "Error: %s" % e]]
 
-
     def onLayoutFinished(self):
         try:
             # select current running image in the list
             self["list"].moveToIndex(self.currentIndex)
             # reload button images
-            reloadButton("red")
-            reloadButton("green")
-            reloadButton("yellow")
-            reloadButton("blue")
-        except:
+            self.reloadButton("red")
+            self.reloadButton("green")
+            self.reloadButton("yellow")
+            self.reloadButton("blue")
+        except Exception:
             pass
-
 
     def reloadButton(self, color):
         image_png = resolveFilename(SCOPE_SKIN_IMAGE, "skin_default/buttons/%s.png" % color)
-        if fileExists(image_png): self["key_%s_pixmap" % color].instance.setPixmapFromFile(image_png)
+        if fileExists(image_png):
+            self["key_%s_pixmap" % color].instance.setPixmapFromFile(image_png)
         image_svg = resolveFilename(SCOPE_SKIN_IMAGE, "skin_default/buttons/%s.svg" % color)
-        if fileExists(image_svg): self["key_%s_pixmap" % color].instance.setPixmapFromFile(image_svg)
+        if fileExists(image_svg):
+            self["key_%s_pixmap" % color].instance.setPixmapFromFile(image_svg)
         return
-
 
     def updateButtons(self):
         current = self["list"].getCurrent()
@@ -173,18 +170,14 @@ class Scripts(Screen):
             self["key_green"].show()
             self["key_green_pixmap"].show()
 
-
     def redPressed(self):
         self.close()
-
 
     def greenPressed(self):
         self.run()
 
-
     def yellowPressed(self):
         self.session.open(MessageBox, _("Not implemented yet!"), type=MessageBox.TYPE_INFO, timeout=5)
-
 
     def bluePressed(self):
         pass
