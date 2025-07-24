@@ -156,6 +156,9 @@ class Scripts(Screen):
         image_png = resolveFilename(SCOPE_SKIN_IMAGE, "skin_default/buttons/%s.png" % color)
         if fileExists(image_png):
             self["key_%s_pixmap" % color].instance.setPixmapFromFile(image_png)
+        image_nn2 = resolveFilename(SCOPE_SKIN_IMAGE, "nn2_default/buttons/%s.png" % color)
+        if fileExists(image_nn2):
+            self["key_%s_pixmap" % color].instance.setPixmapFromFile(image_nn2)
         image_svg = resolveFilename(SCOPE_SKIN_IMAGE, "skin_default/buttons/%s.svg" % color)
         if fileExists(image_svg):
             self["key_%s_pixmap" % color].instance.setPixmapFromFile(image_svg)
