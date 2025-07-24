@@ -3,6 +3,7 @@
 [![License: GPLv3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0.html#license-text)
 [![Plugin Version](https://img.shields.io/github/v/tag/oe-alliance/MultiBootSelectorPlugin)](https://github.com/oe-alliance/MultiBootSelectorPlugin/tags)
 [![Build Status](https://github.com/oe-alliance/MultiBootSelectorPlugin/actions/workflows/release.yml/badge.svg)](https://github.com/oe-alliance/MultiBootSelectorPlugin/actions)
+[![GitHub all releases](https://img.shields.io/github/downloads/oe-alliance/MultiBootSelectorPlugin/total)](https://github.com/oe-alliance/MultiBootSelectorPlugin/releases)
 ---
 
 ## 📦 Overview
@@ -54,16 +55,20 @@
 
 ### 📂 Installation
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/oe-alliance/MultiBootSelectorPlugin.git
-2. Copy all files contained in `src` folder to:
-   ```bash
-   /usr/lib/enigma2/python/Plugins/Extensions/MultiBootSelector/
-3. Ensure backend script is available and executable ([current version](https://raw.githubusercontent.com/oe-alliance/oe-alliance-core/refs/heads/5.6-beta/meta-oe/recipes-kernel/chkroot/multiboot-selector/multiboot-selector.sh)):
+1. Go to the [Releases](https://github.com/oe-alliance/MultiBootSelectorPlugin/releases) page and download the latest .ipk or .deb package for your image.
+2. Transfer the package to your Enigma2 receiver via FTP, SCP, or USB.
+3. Install it via command line:
+   - For .ipk (older OpenATV, OpenPLi, etc.):
+      ```bash
+      opkg install /path/to/enigma2-plugin-extensions-multibootselector_*-r0_all.ipk
+
+   - For .deb (DreamOS, NewNigma2, etc.):
+      ```bash
+      apt install /path/to/enigma2-plugin-extensions-multibootselector_*-r0_all.deb
+4. Ensure backend script is available and executable ([current version](https://raw.githubusercontent.com/oe-alliance/oe-alliance-core/refs/heads/5.6-beta/meta-oe/recipes-kernel/chkroot/multiboot-selector/multiboot-selector.sh)):
    ```bash
    chmod +x /usr/bin/multiboot-selector.sh
-4. Restart Enigma2 GUI or reboot your device.
+5. Restart Enigma2 GUI or reboot your device.
 
 ---
 
