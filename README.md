@@ -1,14 +1,15 @@
-# Enigma2 Legacy MultiBoot Selector
+# Legacy MultiBoot Selector Plugin for Enigma2
 
 [![License: GPLv3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0.html#license-text)
-[![Plugin Version](https://img.shields.io/github/v/tag/oe-alliance/MultiBootSelectorPlugin)](https://github.com/oe-alliance/MultiBootSelectorPlugin/tags)
+[![Lint Status](https://github.com/oe-alliance/MultiBootSelectorPlugin/actions/workflows/lint.yml/badge.svg)](https://github.com/oe-alliance/MultiBootSelectorPlugin/actions)
 [![Build Status](https://github.com/oe-alliance/MultiBootSelectorPlugin/actions/workflows/release.yml/badge.svg)](https://github.com/oe-alliance/MultiBootSelectorPlugin/actions)
-[![GitHub all releases](https://img.shields.io/github/downloads/oe-alliance/MultiBootSelectorPlugin/total)](https://github.com/oe-alliance/MultiBootSelectorPlugin/releases)
----
+[![Plugin Version](https://img.shields.io/github/v/tag/oe-alliance/MultiBootSelectorPlugin?label=Latest%20Version&color=darkviolet)](https://github.com/oe-alliance/MultiBootSelectorPlugin/tags)
+[![Latest Release](https://img.shields.io/github/release-date/oe-alliance/MultiBootSelectorPlugin?label=From&color=darkviolet)](https://github.com/oe-alliance/MultiBootSelectorPlugin/releases/latest)
+[![GitHub all releases](https://img.shields.io/github/downloads/oe-alliance/MultiBootSelectorPlugin/total.svg?label=Downloads&color=darkgrey)](https://github.com/oe-alliance/MultiBootSelectorPlugin/releases)
 
 ## 📦 Overview
 
-**Legacy MultiBoot for Enigma2** is a lightweight plugin enabling users to view and select available multiboot slots directly from their Enigma2 receiver GUI. It integrates seamlessly with Images without built-in multiboot support.
+**Legacy MultiBoot Selector Plugin for Enigma2** is a lightweight plugin enabling users to view and select available multiboot slots directly from their Enigma2 receiver GUI. It integrates seamlessly with Images without built-in multiboot support.
 
 ---
 
