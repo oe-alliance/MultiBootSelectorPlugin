@@ -28,6 +28,7 @@ except Exception:
 from os.path import isfile
 from subprocess import PIPE, Popen
 from re import match
+from collections import namedtuple
 
 
 def Plugins(**kwargs):
@@ -61,9 +62,6 @@ class Scripts(Screen):
 
         <widget name="key_yellow_pixmap" pixmap="skin_default/buttons/yellow.png" position="330,470" size="150,40" scale="stretch" alphatest="on" />
         <widget name="key_yellow" position="330,470" size="150,40" font="Regular;20" zPosition="1" halign="center" valign="center" backgroundColor="#9f1313" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
-
-        <widget name="key_blue_pixmap" pixmap="skin_default/buttons/blue.png" position="330,470" size="150,40" scale="stretch" alphatest="on" />
-        <widget name="key_blue" position="490,470" size="150,40" font="Regular;20" zPosition="1" halign="center" valign="center" backgroundColor="#9f1313" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
     </screen>"""
 
     def __init__(self, session, args=None):
@@ -71,12 +69,13 @@ class Scripts(Screen):
         self.title = "Select Boot Slot - Version %s" % PV
         self["header"] = Label(_("Boot device not found!"))
         self.session = session
+        self.SlotEntry = namedtuple("SlotEntry", ["index", "label"])
         self.cmd = "/usr/bin/multiboot-selector.sh"
         self.slist = []
         self.currentIndex = 0
         self.output_lines = []
         self.reload_list()
-        self["list"] = MenuList([item[1] for item in self.slist])
+        self["list"] = MenuList([entry.label for entry in self.slist])
         if hasattr(self["list"].l, "setItemHeight"):
             self["list"].l.setItemHeight(30)
 
@@ -86,10 +85,6 @@ class Scripts(Screen):
         self["key_green_pixmap"] = Pixmap()
         self["key_yellow"] = Button(_("Reset"))
         self["key_yellow_pixmap"] = Pixmap()
-        self["key_blue"] = Button(_("tbd"))
-        self["key_blue"].hide()
-        self["key_blue_pixmap"] = Pixmap()
-        self["key_blue_pixmap"].hide()
 
         self["actions"] = ActionMap(["OkCancelActions", "ColorActions"], {
             "ok": self.greenPressed,
@@ -97,7 +92,6 @@ class Scripts(Screen):
             "red": self.redPressed,
             "green": self.greenPressed,
             "yellow": self.yellowPressed,
-            "blue": self.bluePressed
         }, -1)
 
         self.updateButtons()
@@ -106,7 +100,7 @@ class Scripts(Screen):
 
     def run(self):
         slot_name = self["list"].getCurrent()
-        slot_idx = next((str(sublist[0]) for sublist in self.slist if sublist[1] == slot_name), -1)
+        slot_idx = next((str(s.index) for s in self.slist if s.label == slot_name), "-1")
         if slot_name is None or slot_idx == "-1":
             return
         slot_cmd = "%s %s" % (self.cmd, slot_idx)
@@ -119,60 +113,65 @@ class Scripts(Screen):
     def reload_list(self):
         try:
             if not isfile(self.cmd):
-                self.slist = [[-1, "Error: File '%s' is not available!" % self.cmd]]
+                self.slist = [self.SlotEntry(-1, "Error: File '%s' is not available!" % self.cmd)]
             else:
                 process = Popen([self.cmd, "list"], stdout=PIPE, stderr=PIPE, universal_newlines=True)
                 stdout, stderr = process.communicate()
 
                 for line in stdout.splitlines():
                     line = line.rstrip()
-                    if match(r'^BOOT.*:', line):
+                    if match(r'^\s*BOOT.*?:', line):
                         self["header"].setText(_(line))
                     elif match(r'^.*\)\ Slot', line):
                         entries = line.split()
                         image = " ".join(entries[2:])
-                        self.slist.append([entries[0].split(")")[0] if "Empty" not in image else "-1", "%s '%s' %s" % (entries[1], entries[0].split(")")[0], image)])
+                        idx = entries[0].split(")")[0]
+                        label = "%s '%s' %s" % (entries[1], idx, image)
+                        idx = idx if "Empty" not in image else "-1"
+                        self.slist.append(self.SlotEntry(idx, label))
                         if line.endswith("Current"):
                             self.currentIndex = len(self.slist) - 1
                     self.output_lines.append(line)
 
                 if not self.slist:
-                    self.slist = [[-1, "Error: %s" % self.output_lines[-1]]]
+                    self.slist = [self.SlotEntry(-1, "Error: %s" % self.output_lines[-1])]
         except Exception as e:
-            self.slist = [[-1, "Error: %s" % e]]
+            self.slist = [self.SlotEntry(-1, "Error: %s" % e)]
 
     def onLayoutFinished(self):
         try:
             # select current running image in the list
             self["list"].moveToIndex(self.currentIndex)
             # reload button images
-            self.reloadButton("red")
-            self.reloadButton("green")
-            self.reloadButton("yellow")
-            self.reloadButton("blue")
+            self.reloadButton(["red", "green", "yellow"])
         except Exception:
             pass
 
-    def reloadButton(self, color):
-        image_png = resolveFilename(SCOPE_SKIN_IMAGE, "skin_default/buttons/%s.png" % color)
-        if fileExists(image_png):
-            self["key_%s_pixmap" % color].instance.setPixmapFromFile(image_png)
-        image_nn2 = resolveFilename(SCOPE_SKIN_IMAGE, "nn2_default/buttons/%s.png" % color)
-        if fileExists(image_nn2):
-            self["key_%s_pixmap" % color].instance.setPixmapFromFile(image_nn2)
-        image_svg = resolveFilename(SCOPE_SKIN_IMAGE, "skin_default/buttons/%s.svg" % color)
-        if fileExists(image_svg):
-            self["key_%s_pixmap" % color].instance.setPixmapFromFile(image_svg)
-        return
+    def reloadButton(self, colors):
+        if isinstance(colors, str):
+            colors = [colors]
+
+        skin_paths = [
+            "skin_default/buttons/{}.png",
+            "nn2_default/buttons/{}.png",
+            "skin_default/buttons/{}.svg"
+        ]
+
+        for color in colors:
+            pixmap = self.get("key_{}_pixmap".format(color))
+            if not pixmap:
+                continue
+            for path_template in skin_paths:
+                path = resolveFilename(SCOPE_SKIN_IMAGE, path_template.format(color))
+                if fileExists(path):
+                    pixmap.instance.setPixmapFromFile(path)
+                    break
 
     def updateButtons(self):
-        current = self["list"].getCurrent()
-        if current and "Empty" in current:
-            self["key_green"].hide()
-            self["key_green_pixmap"].hide()
-        else:
-            self["key_green"].show()
-            self["key_green_pixmap"].show()
+        current = self["list"].getCurrent() or ""
+        func = "hide" if not current or any(x in current for x in ("Empty", "Error:")) else "show"
+        for widget in ("key_green", "key_green_pixmap"):
+            getattr(self[widget], func)()
 
     def redPressed(self):
         self.close()
@@ -182,6 +181,3 @@ class Scripts(Screen):
 
     def yellowPressed(self):
         self.session.open(MessageBox, _("Please boot into the root image and use the provided MultiBoot Manager."), type=MessageBox.TYPE_INFO, timeout=5)
-
-    def bluePressed(self):
-        pass
