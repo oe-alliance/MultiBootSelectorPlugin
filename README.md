@@ -36,6 +36,7 @@
 
 - **Plugin Type:** Enigma2 python plugin
 - **Backend Dependency:** `/usr/bin/multiboot-selector.sh` with executable permissions
+- Python Compatibility: Fully compatible with both Python 2 and Python 3 environments
 - **Tested On:** several images without built-in multiboot support
 - **Load Condition:** Only loads if `BoxInfo.getItem("HasChkrootMultiboot")` is `None` or unavailable (therefore it is not loaded on current OE Alliance images with integrated multiboot support)
 
