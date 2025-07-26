@@ -181,7 +181,7 @@ class Scripts(Screen):
         self.run()
 
     def yellowPressed(self):
-        self.session.open(MessageBox, _("Not implemented yet!"), type=MessageBox.TYPE_INFO, timeout=5)
+        self.session.open(MessageBox, _("Please boot into the root image and use the provided MultiBoot Manager."), type=MessageBox.TYPE_INFO, timeout=5)
 
     def bluePressed(self):
         pass
