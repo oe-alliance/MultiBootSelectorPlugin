@@ -77,7 +77,8 @@ class Scripts(Screen):
         self.output_lines = []
         self.reload_list()
         self["list"] = MenuList([item[1] for item in self.slist])
-        self["list"].l.setItemHeight(30)
+        if hasattr(self["list"].l, "setItemHeight"):
+            self["list"].l.setItemHeight(30)
 
         self["key_red"] = Button(_("Cancel"))
         self["key_red_pixmap"] = Pixmap()
