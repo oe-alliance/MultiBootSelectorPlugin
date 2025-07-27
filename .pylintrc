@@ -1,0 +1,15 @@
+[FORMAT]
+max-line-length = 120
+
+[VARIABLES]
+additional-builtins=_
+
+[MESSAGES CONTROL]
+disable=
+    missing-docstring,
+    line-too-long,
+    unused-argument,
+    consider-using-with,
+    invalid-name,
+    import-error,
+    consider-using-f-string
