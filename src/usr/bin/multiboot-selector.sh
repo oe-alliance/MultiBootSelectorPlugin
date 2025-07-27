@@ -54,8 +54,8 @@ image_info() {
         mountpoint -q "$LAST_TMPDIR" && umount -f "$LAST_TMPDIR" &>/dev/null && rm -rf "$LAST_TMPDIR"
 
         tmpdir="$(mktemp -d)/"
-        [ "$ROOTFS_TYPE" == "ubifs" -o "$ROOTFS_TYPE" == "ext4" ] && mount_option="-t $ROOTFS_TYPE"
-        mount $mount_option "$ROOT_PARTITION" "$tmpdir" &>/dev/null
+        [ "$ROOTFS_TYPE" == "ubifs" ] || [ "$ROOTFS_TYPE" == "ext4" ] && mount_options=(-t "$ROOTFS_TYPE")
+        mount "${mount_options[@]}" "$ROOT_PARTITION" "$tmpdir" &>/dev/null
 
         LAST_ROOT_PARTITION="$ROOT_PARTITION"
         LAST_TMPDIR="$tmpdir"
@@ -101,7 +101,7 @@ image_info() {
         distro="${distro:-$(head -n 1 "$distro_file_issue" | cut -d ' ' -f 1 | xargs)}"
         distro="${known_distros[$distro]:-$distro}"
         version="${version:-$(head -n 1 "$distro_file_issue" | cut -d ' ' -f 2 | xargs)}"
-        IMAGE_INFO_RESULT="Slot $type: $(echo $distro $version | xargs) ($date)$current"
+        IMAGE_INFO_RESULT="Slot $type: $(echo "$distro" "$version" | xargs) ($date)$current"
     else
         oem=$(basename "$STARTUP_FILE" | awk -F'_' '{print $NF}')
         [[ "$oem" =~ ^[0-9]+$ ]] && distro="Empty" || distro="$oem OEM"
@@ -113,7 +113,7 @@ select_image() {
     local idx=$1
     echo "Image ${choices[$idx]} selected"
     ROOT_PARTITION="${ROOT_PARTITIONS[$idx]}"
-    KERNEL_PATH="${KERNEL_PATHS[$idx]}"
+    #KERNEL_PATH="${KERNEL_PATHS[$idx]}"
     ROOT_SUBDIR="${ROOT_SUBDIRS[$idx]}"
     ROOTFS_TYPE="${ROOTFS_TYPES[$idx]}"
     STARTUP_FILE="${STARTUP_FILES[$idx]}"
@@ -223,7 +223,7 @@ for FILE in $(ls -v /boot/STARTUP_*); do
         KERNEL_PATHS+=("$KERNEL")
         grep -q 'kexec=1' /proc/cmdline && { [[ ! "$KERNEL" == *$ROOTSUBDIR* ]] && ROOT_SUBDIRS+=("") || ROOT_SUBDIRS+=("$ROOTSUBDIR"); } || ROOT_SUBDIRS+=("$ROOTSUBDIR")
         ROOTFS_TYPES+=("$ROOTFSTYPE")
-        STARTUP_FILES+=("$(basename $FILE)")
+        STARTUP_FILES+=("$(basename "$FILE")")
         image_info "$idx" "$MB_TYPE"
         images+=("$IMAGE_INFO_RESULT")
         idx=$((idx + 1))
@@ -238,12 +238,12 @@ if [ ${#images[@]} -eq 0 ]; then
     exit 1
 fi
 
-if [ -z "$image_choice" -o "$image_choice" == "list" ]; then
+if [ -z "$image_choice" ] || [ "$image_choice" == "list" ]; then
     echo "Please select an image:"
     for i in "${!images[@]}"; do
         echo "${choices[$i]}) ${images[$i]}"
     done
-    [ -z "$image_choice" ] && read -p "Select an image (number): " image_choice
+    [ -z "$image_choice" ] && read -rp "Select an image (number): " image_choice
     [ "$image_choice" == "list" ] && exit 0
 fi
 
