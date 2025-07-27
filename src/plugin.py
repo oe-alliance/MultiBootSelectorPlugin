@@ -6,29 +6,29 @@
 #                                       #
 #########################################
 
-from . import PV, PN, PD
-from Screens.Screen import Screen
-from Screens.MessageBox import MessageBox
-from Screens.Console import Console
-from Plugins.Plugin import PluginDescriptor
-from Components.MenuList import MenuList
-from Components.ActionMap import ActionMap
-from Components.Pixmap import Pixmap
-from Components.Button import Button
-from Components.Label import Label
-from Screens.Standby import TryQuitMainloop
-from Tools.Directories import fileExists, resolveFilename, SCOPE_SKIN_IMAGE
-
 try:
     from Components.SystemInfo import BoxInfo
     PLUGIN_LOAD = BoxInfo.getItem("HasChkrootMultiboot") is None
-except Exception:
+except (ImportError, AttributeError):
     PLUGIN_LOAD = True
-
 from os.path import isfile
-from subprocess import PIPE, Popen
+from subprocess import Popen, PIPE
 from re import match
 from collections import namedtuple
+
+from Components.ActionMap import ActionMap
+from Components.Button import Button
+from Components.Label import Label
+from Components.MenuList import MenuList
+from Components.Pixmap import Pixmap
+from Plugins.Plugin import PluginDescriptor
+from Screens.Console import Console
+from Screens.MessageBox import MessageBox
+from Screens.Screen import Screen
+from Screens.Standby import TryQuitMainloop
+from Tools.Directories import fileExists, resolveFilename, SCOPE_SKIN_IMAGE
+
+from . import PV, PN, PD
 
 
 def Plugins(**kwargs):
@@ -133,19 +133,16 @@ class Scripts(Screen):
                             self.currentIndex = len(self.slist) - 1
                     self.output_lines.append(line)
 
-                if not self.slist:
+                if not self.slist or stderr:
                     self.slist = [self.SlotEntry(-1, "Error: %s" % self.output_lines[-1])]
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             self.slist = [self.SlotEntry(-1, "Error: %s" % e)]
 
     def onLayoutFinished(self):
-        try:
-            # select current running image in the list
-            self["list"].moveToIndex(self.currentIndex)
-            # reload button images
-            self.reloadButton(["red", "green", "yellow"])
-        except Exception:
-            pass
+        # select current running image in the list
+        self["list"].moveToIndex(self.currentIndex)
+        # reload button images
+        self.reloadButton(["red", "green", "yellow"])
 
     def reloadButton(self, colors):
         if isinstance(colors, str):
