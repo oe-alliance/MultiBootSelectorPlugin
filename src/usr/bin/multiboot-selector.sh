@@ -35,13 +35,15 @@ declare -A known_distros=(
     ["teamblue"]="teamBlue"
     ["vti"]="VTi"
     ["newnigma2"]="Newnigma2"
+    ["pure2"]="PurE2"
     ["Dreambox"]="DreamOS"
     ["opendreambox"]="OpenDreambox"
-    ["unknown"]="Unknown Image/Distro"
+    ["unknown"]="Unknown Distro"
 )
 
 image_info() {
-    idx=$1
+    local idx=$1
+    local MB_TYPE=$2
     ROOT_PARTITION="${ROOT_PARTITIONS[$idx]}"
     ROOT_SUBDIR="${ROOT_SUBDIRS[$idx]}"
     ROOTFS_TYPE="${ROOTFS_TYPES[$idx]}"
@@ -62,6 +64,8 @@ image_info() {
     if [[ "$STARTUP_FILE" == *FLASH* ]] && [ "$ROOTFS_TYPE" == "ubifs" ]; then
         type="UBI"
     elif [[ "$STARTUP_FILE" == *FLASH* ]]; then
+        type="FLASH"
+    elif [[ "$STARTUP_FILE" == *RECOVERY* ]] && [ "$MB_TYPE" == "gpt" ]; then
         type="FLASH"
     elif [[ "$ROOT_PARTITION" == *mmcblk* ]]; then
         type="eMMC"
@@ -106,7 +110,7 @@ image_info() {
 }
 
 select_image() {
-    idx=$1
+    local idx=$1
     echo "Image ${choices[$idx]} selected"
     ROOT_PARTITION="${ROOT_PARTITIONS[$idx]}"
     KERNEL_PATH="${KERNEL_PATHS[$idx]}"
@@ -122,6 +126,7 @@ ROOT_PARTITIONS=()
 KERNEL_PATHS=()
 ROOT_SUBDIRS=()
 STARTUP_FILES=()
+BOOTFS_TYPE="vfat"
 
 # chkroot - special multiboot machines
 if grep -q -E "dm820|dm7080|dm900|dm920" /proc/stb/info/model 2>/dev/null || grep -q -E "beyonwizu4|et11000|sf4008" /proc/stb/info/boxtype 2>/dev/null; then
@@ -145,6 +150,11 @@ else
             esac
         fi
     done
+fi
+
+# gpt - multiboot machines
+if grep -q -E "one|two" /proc/stb/info/model 2>/dev/null && [ -z "$BOOT" ]; then
+    BOOT=$(blkid | awk -F: '/LABEL="dreambox-data"/ {print $1}' | grep '/dev/mmcblk0p') && { MB_TYPE="gpt"; BOOTFS_TYPE="ext4"; }
 fi
 
 # chkroot - ubifs multiboot machines
@@ -187,7 +197,7 @@ echo "BOOT ${MB_TYPE:-device not} found${BOOT:+: $BOOT}"
 
 (echo 0 > /sys/block/mmcblk0boot1/force_ro) 2>/dev/null
 mkdir -p /boot 2>/dev/null
-mount -t vfat "$BOOT" /boot 2>/dev/null
+mount -t "$BOOTFS_TYPE" "$BOOT" /boot 2>/dev/null
 
 idx=0
 for FILE in $(ls -v /boot/STARTUP_*); do
@@ -214,7 +224,8 @@ for FILE in $(ls -v /boot/STARTUP_*); do
         grep -q 'kexec=1' /proc/cmdline && { [[ ! "$KERNEL" == *$ROOTSUBDIR* ]] && ROOT_SUBDIRS+=("") || ROOT_SUBDIRS+=("$ROOTSUBDIR"); } || ROOT_SUBDIRS+=("$ROOTSUBDIR")
         ROOTFS_TYPES+=("$ROOTFSTYPE")
         STARTUP_FILES+=("$(basename $FILE)")
-        image_info "$idx"; images+=("$IMAGE_INFO_RESULT")
+        image_info "$idx" "$MB_TYPE"
+        images+=("$IMAGE_INFO_RESULT")
         idx=$((idx + 1))
     fi
 done
@@ -266,8 +277,19 @@ for i in "${!choices[@]}"; do
     fi
 done
 
-echo "Copying /boot/$STARTUP_FILE to /boot/STARTUP..."
-cp "/boot/$STARTUP_FILE" "/boot/STARTUP"
+if [ ! "$MB_TYPE" == "gpt" ]; then
+    echo "Copying /boot/$STARTUP_FILE to /boot/STARTUP..."
+    cp "/boot/$STARTUP_FILE" "/boot/STARTUP"
+else
+    if [ -f "/boot/bootconfig.txt" ]; then
+        echo "Setting default=$choice_index in /boot/bootconfig.txt..."
+        sed -i "s/^default=.*/default=$choice_index/" /boot/bootconfig.txt
+    else
+        echo "File '/boot/bootconfig.txt' for ${MB_TYPE} multiboot not found!"
+        umount /boot 2>/dev/null
+        exit 1
+    fi
+fi
 
 echo "Selected ROOT partition: $ROOT_PARTITION"
 echo "Selected ROOTSUBDIR: $ROOT_SUBDIR"
