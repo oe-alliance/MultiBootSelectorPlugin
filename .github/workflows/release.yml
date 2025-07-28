@@ -12,28 +12,49 @@ jobs:
   release:
     runs-on: ubuntu-latest
     env:
+      GH_TOKEN: ${{ github.token }}
       release_version: ${{ github.ref_name }}
+      current_tag: ${{ github.ref_name }}
       ref_type: ${{ github.ref_type }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up build environment
         run: |
           sudo apt update
-          sudo apt install -y fakeroot dpkg tar gzip xz-utils
+          sudo apt install -y gh jq fakeroot dpkg tar gzip xz-utils
 
           # Prepare control file
           if [ "${ref_type}" != "tag" ]; then
+            current_tag="${{ github.sha }}"
             release_version="$(awk -F'"' '/^PV *=/ {print $2}' src/__init__.py)-pre"
             echo "release_version=${release_version}" >> $GITHUB_ENV
           fi
           sed -i "s/^Version: .*/Version: ${release_version}/" CONTROL/control
           sed -i "s/^\(PV *= *\).*/\1\"${release_version}\"/" src/__init__.py
 
-          # multiboot-selector.sh must be executable
+          # Script multiboot-selector.sh must be executable
           chmod +x src/usr/bin/multiboot-selector.sh
+
+          # Generate release notes body using GitHub API
+          gh api repos/${{ github.repository }}/releases/generate-notes \
+            -f tag_name="$release_version" > changelog.json
+
+          # Add download counter badge to release_body.md
+          printf "![Downloads](https://img.shields.io/github/downloads/oe-alliance/MultiBootSelectorPlugin/${release_version}/total?color=blue&style=flat-square)\n\n" > badge.txt
+
+          # Add changelog with commit messages to release_body.md
+          previous_tag=$(git describe --tags --abbrev=0 "$current_tag^")
+          printf "## Commits since $previous_tag\n" > commits.txt
+          git log --pretty=format:"- %s (%h)" $previous_tag..$current_tag >> commits.txt
+
+          # Add the 'body' field from JSON to release_body.md
+          { printf "\n\n"; jq -r '.body' changelog.json; } > changlog.txt
+          cat badge.txt commits.txt changlog.txt > release_body.md
 
       # Build .deb package
       - name: Build .deb package
@@ -81,7 +102,7 @@ jobs:
           files: |
             enigma2-plugin-extensions-multibootselector_*_all.deb
             enigma2-plugin-extensions-multibootselector_*_all.ipk
-          generate_release_notes: true
+          body_path: release_body.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -89,14 +110,13 @@ jobs:
       # ✅ Create GitHub artifacts for testing
       # =============================
       - name: Upload build artifacts
-        if: github.ref_type != 'tag' || !github.ref_type
+        if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
-          name: packages_${{ env.release_version }}
+          name: enigma2-plugin-extensions-multibootselector_${{ env.release_version }}
           retention-days: 1
           compression-level: 9
           path: |
             enigma2-plugin-extensions-multibootselector_*_all.deb
             enigma2-plugin-extensions-multibootselector_*_all.ipk
-
-
+            commits.txt
