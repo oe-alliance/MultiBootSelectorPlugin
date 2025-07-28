@@ -6,7 +6,7 @@ Section: extra
 Priority: optional
 Maintainer: OE-Alliance Team
 License: GPL-3.0
-Homepage: www.opena.tv
+Homepage: https://www.opena.tv
 Source: https://github.com/oe-alliance/MultiBootSelectorPlugin
 Depends: bash
 Replaces: multiboot-selector
