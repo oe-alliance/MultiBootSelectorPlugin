@@ -15,12 +15,13 @@
 
 ## 🚀 Features
 
-- Calls backend script for slot switching
+- Uses backend (bash) script for slot switching
 - Dynamic list of available multiboot slots
 - Displays current active boot slot
 - Safe restart into the selected slot
 - Accessible via Plugin Menu, Extensions Menu, and Shutdown Menu
 - Clean and minimal user interface
+- Update the plugin from within the GUI (blue button)
 
 ---
 
@@ -35,7 +36,6 @@
 ## 🛠️ Technical Details
 
 - **Plugin Type:** Enigma2 python plugin
-- **Backend Dependency:** `/usr/bin/multiboot-selector.sh` with executable permissions
 - Python Compatibility: Fully compatible with both Python 2 and Python 3 environments
 - **Tested On:** several images without built-in multiboot support
 - **Load Condition:** Only loads if `BoxInfo.getItem("HasChkrootMultiboot")` is `None` or unavailable (therefore it is not loaded on current OE Alliance images with integrated multiboot support)
@@ -62,21 +62,40 @@
 3. Install it via command line:
    - For .ipk (older OpenATV, OpenPLi, etc.):
       ```bash
-      opkg install /path/to/enigma2-plugin-extensions-multibootselector_*-r0_all.ipk
+      opkg install /tmp/enigma2-plugin-extensions-multibootselector_*.ipk
 
    - For .deb (DreamOS, NewNigma2, etc.):
       ```bash
-      apt install /path/to/enigma2-plugin-extensions-multibootselector_*-r0_all.deb
-4. Ensure backend script is available and executable ([current version](https://raw.githubusercontent.com/oe-alliance/oe-alliance-core/refs/heads/5.6-beta/meta-oe/recipes-kernel/chkroot/multiboot-selector/multiboot-selector.sh)):
-   ```bash
-   chmod +x /usr/bin/multiboot-selector.sh
-5. Restart Enigma2 GUI or reboot your device.
+      dpkg -i /tmp/enigma2-plugin-extensions-multibootselector_*.deb
+4. Restart Enigma2 GUI or reboot your device.
 
 ---
 
-### ❗ Limitations
+### 🔄 Built-in Updater
 
-- Requires an existing `/usr/bin/multiboot-selector.sh` script for functionality.
+Once the plugin is installed, you can update to the latest GitHub release directly from within the plugin interface.
+
+To update:
+1. Open the plugin
+2. Press the blue button
+3. Confirm update when prompted
+
+The plugin will automatically fetch the latest release from GitHub and install it.
+
+---
+
+### 🖥️ Usage
+
+1. Launch the plugin from:
+   - Plugins Menu
+   - Extensions Menu
+   - Shutdown Menu
+2. Use the arrow keys to navigate and select the boot slot
+3. Use color buttons for the following actions:
+   - Red – Cancel / Exit
+   - Green – Boot selected image
+   - Yellow – More info
+   - Blue – Check for and install plugin updates
 
 ---
 
