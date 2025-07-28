@@ -85,7 +85,8 @@ image_info() {
     cmp -s "/boot/STARTUP" "/boot/$STARTUP_FILE" && current=' - Current' || current=''
 
     if [ -f "$enigma_file_binary" ]; then
-        e2date=$(stat -c %z "$enigma_file_binary" | cut -d ' ' -f 1 | xargs)
+        e2date=$(stat -c %z "$enigma_file_binary" 2>/dev/null | cut -d ' ' -f 1 | xargs)
+        e2date="${e2date:-$(python -c "import os, time; print(time.strftime('%Y-%m-%d', time.localtime(os.path.getmtime('$enigma_file_binary'))))")}"
 
         if [ -f "$distro_file_enigma" ]; then
             distro=$(grep '^distro=' "$distro_file_enigma" | cut -d '=' -f 2 | xargs)
