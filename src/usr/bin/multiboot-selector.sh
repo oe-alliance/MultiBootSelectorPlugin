@@ -41,6 +41,69 @@ declare -A known_distros=(
     ["unknown"]="Unknown Distro"
 )
 
+detect_multiboot() {
+    # chkroot - special multiboot machines
+    if grep -q -E "dm820|dm7080|dm900|dm920" /proc/stb/info/model 2>/dev/null || grep -q -E "beyonwizu4|et11000|sf4008" /proc/stb/info/boxtype 2>/dev/null; then
+        BOOT="/dev/mmcblk0boot1"
+        MB_TYPE="chkroot"
+    # chkroot - emmc multiboot machines
+    else
+        for i in /sys/block/mmcblk0/mmcblk0p*; do
+            if [ -f "$i/uevent" ]; then
+                partname=$(grep '^PARTNAME=' "$i/uevent" | cut -d '=' -f 2)
+                devname=$(grep DEVNAME "$i/uevent" | cut -d '=' -f 2)
+                case "$partname" in
+                    others|startup)
+                        BOOT="/dev/$devname"
+                        MB_TYPE="chkroot"
+                        ;;
+                    other2)
+                        BOOT="/dev/mmcblk0boot1"
+                        MB_TYPE="chkroot"
+                        ;;
+                esac
+            fi
+        done
+    fi
+    # kexec - multiboot machines
+    if [ -z "$BOOT" ]; then
+        if grep -q 'kexec=1' /proc/cmdline; then
+            for dev in /dev/mmcblk0p{4,7,9}; do
+                type=$(blkid -s TYPE -o value "$dev" 2>/dev/null)
+                if [ -n "$type" ]; then
+                    BOOT="$dev"
+                    MB_TYPE="kexec"
+                    break
+                fi
+            done
+        fi
+    fi
+    # gpt - multiboot machines
+    if grep -q -E "one|two" /proc/stb/info/model 2>/dev/null && [ -z "$BOOT" ]; then
+        BOOT=$(blkid | awk -F: '/LABEL="dreambox-data"/ {print $1}' | grep '/dev/mmcblk0p') && { MB_TYPE="gpt"; BOOTFS_TYPE="ext4"; }
+    fi
+    # oem - multiboot machines
+    if [ -z "$BOOT" ]; then
+        BOOT=$(blkid | awk -F: '/TYPE="vfat"/ {print $1}' | grep '/dev/mmcblk0p') && MB_TYPE="oem"
+    fi
+    # chkroot - ubifs multiboot machines
+    if [ -z "$BOOT" ]; then
+        for dev in /dev/sd[a-d]1; do
+            label_type=$(blkid -s LABEL -s TYPE -o value "$dev" 2>/dev/null)
+            if [[ "$label_type" == *STARTUP* ]]; then
+                BOOT="$dev"
+                MB_TYPE="chkroot"
+                break
+            fi
+            if [[ "$label_type" == *vfat* ]]; then
+                BOOT="$dev"
+                MB_TYPE="chkroot"
+                break
+            fi
+        done
+    fi
+}
+
 image_info() {
     local idx=$1
     local MB_TYPE=$2
@@ -129,72 +192,12 @@ ROOT_SUBDIRS=()
 STARTUP_FILES=()
 BOOTFS_TYPE="vfat"
 
-# chkroot - special multiboot machines
-if grep -q -E "dm820|dm7080|dm900|dm920" /proc/stb/info/model 2>/dev/null || grep -q -E "beyonwizu4|et11000|sf4008" /proc/stb/info/boxtype 2>/dev/null; then
-    BOOT="/dev/mmcblk0boot1"
-    MB_TYPE="chkroot"
-# chkroot - emmc multiboot machines
-else
-    for i in /sys/block/mmcblk0/mmcblk0p*; do
-        if [ -f "$i/uevent" ]; then
-            partname=$(grep '^PARTNAME=' "$i/uevent" | cut -d '=' -f 2)
-            devname=$(grep DEVNAME "$i/uevent" | cut -d '=' -f 2)
-            case "$partname" in
-                others|startup)
-                    BOOT="/dev/$devname"
-                    MB_TYPE="chkroot"
-                    ;;
-                other2)
-                    BOOT="/dev/mmcblk0boot1"
-                    MB_TYPE="chkroot"
-                    ;;
-            esac
-        fi
-    done
-fi
-
-# gpt - multiboot machines
-if grep -q -E "one|two" /proc/stb/info/model 2>/dev/null && [ -z "$BOOT" ]; then
-    BOOT=$(blkid | awk -F: '/LABEL="dreambox-data"/ {print $1}' | grep '/dev/mmcblk0p') && { MB_TYPE="gpt"; BOOTFS_TYPE="ext4"; }
-fi
-
-# chkroot - ubifs multiboot machines
+detect_multiboot
+echo -e "BOOT ${MB_TYPE:-device not} found${BOOT:+: $BOOT}\n"
 if [ -z "$BOOT" ]; then
-    for dev in /dev/sd[a-d]1; do
-        label_type=$(blkid -s LABEL -s TYPE -o value "$dev" 2>/dev/null)
-        if [[ "$label_type" == *STARTUP* ]]; then
-            BOOT="$dev"
-            MB_TYPE="chkroot"
-            break
-        fi
-        if [[ "$label_type" == *vfat* ]]; then
-            BOOT="$dev"
-            MB_TYPE="chkroot"
-            break
-        fi
-    done
+    echo "MultiBoot type could not be detected!"
+    exit 1
 fi
-
-# kexec - multiboot machines
-if [ -z "$BOOT" ]; then
-    if grep -q 'kexec=1' /proc/cmdline; then
-        for dev in /dev/mmcblk0p{4,7,9}; do
-            type=$(blkid -s TYPE -o value "$dev" 2>/dev/null)
-            if [ -n "$type" ]; then
-                BOOT="$dev"
-                MB_TYPE="kexec"
-                break
-            fi
-        done
-    fi
-fi
-
-# oem supported - multiboot machines
-if [ -z "$BOOT" ]; then
-    BOOT=$(blkid | awk -F: '/TYPE="vfat"/ {print $1}' | grep '/dev/mmcblk0p') && MB_TYPE="oem"
-fi
-
-echo "BOOT ${MB_TYPE:-device not} found${BOOT:+: $BOOT}"
 
 (echo 0 > /sys/block/mmcblk0boot1/force_ro) 2>/dev/null
 mkdir -p /boot 2>/dev/null
@@ -234,7 +237,7 @@ done
 mountpoint -q "$LAST_TMPDIR" && umount -f "$LAST_TMPDIR" &>/dev/null && rm -rf "$LAST_TMPDIR"
 
 if [ ${#images[@]} -eq 0 ]; then
-    echo "No available images to select from."
+    echo "No available images to select from!"
     umount /boot 2>/dev/null
     exit 1
 fi
