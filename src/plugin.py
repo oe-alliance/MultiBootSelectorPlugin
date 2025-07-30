@@ -19,7 +19,7 @@ from json import loads as json_loads, dumps as json_dumps
 
 try:
     from Components.SystemInfo import BoxInfo
-    PLUGIN_LOAD = BoxInfo.getItem("HasChkrootMultiboot") is None
+    PLUGIN_LOAD = not BoxInfo.getItem("HasChkrootMultiboot")
 except (ImportError, AttributeError):
     PLUGIN_LOAD = True
 from Components.ActionMap import ActionMap
@@ -114,7 +114,7 @@ class Scripts(Screen):
         self["list"].onSelectionChanged.append(self.updateButtons)
         self.onLayoutFinish.append(self.onLayoutFinished)
 
-    def run(self):
+    def bootSelectedSlot(self):
         slot_name = self["list"].getCurrent()
         slot_idx = next((str(s.index) for s in self.slist if s.label == slot_name), "-1")
         if slot_name is None or slot_idx == "-1":
@@ -128,7 +128,7 @@ class Scripts(Screen):
 
         try:
             if not isfile(slotCmd):
-                self.slist = [slotEntry(-1, "Error: File '%s' is not available!" % slotCmd)]
+                self.slist = [slotEntry(-1, _("Error: File '%s' is not available!") % slotCmd)]
             else:
                 process = Popen([slotCmd, "list"], stdout=PIPE, stderr=PIPE, universal_newlines=True)
                 stdout, stderr = process.communicate()
@@ -170,7 +170,7 @@ class Scripts(Screen):
         ]
 
         for color in colors:
-            pixmap = self.get("key_{}_pixmap".format(color))
+            pixmap = self.get("key_{}_pixmap".format(color), None)
             if not pixmap:
                 continue
             for path_template in skin_paths:
@@ -193,15 +193,20 @@ class Scripts(Screen):
         self.close()
 
     def greenPressed(self):
-        self.run()
+        self.bootSelectedSlot()
 
     def yellowPressed(self):
-        self.session.open(MessageBox, _("For advanced features like slot management, please boot into the root image and use the provided MultiBoot Manager."), type=MessageBox.TYPE_INFO, timeout=5, title=_("Advanced features"))
+        self.session.open(
+            MessageBox,
+            _("For advanced features like slot management, please boot into the root image and use the provided MultiBoot Manager."),
+            type=MessageBox.TYPE_INFO,
+            timeout=10
+        )
 
     def bluePressed(self):
         def onDownloadError(error):
             message = error.getErrorMessage() if hasattr(error, "getErrorMessage") else str(error)
-            self.session.open(MessageBox, message, MessageBox.TYPE_ERROR, title=_("Update error"))
+            self.session.open(MessageBox, message, MessageBox.TYPE_ERROR)
 
         def doPluginUpdate(result=None):
             def onDownloadSuccess(result):
@@ -240,7 +245,7 @@ class Scripts(Screen):
                 if match(pattern, asset.get("name", "")):
                     target_url = str(asset.get("browser_download_url"))
                     break
-            print("%s" % PN, "%s - %s" % (version, target_url))
+            print("[%s] Found version %s at %s" % (PN, version, target_url))
 
             if not target_url:
                 onDownloadError(_("No suitable %s package found!" % installer["ext"]) + "\n\n%s.%s\n%s" % (pkgName, installer["ext"], str(json_dumps(filtered_assets, indent=2))))
@@ -254,11 +259,10 @@ class Scripts(Screen):
                 _("Do you want to update to latest version %s?\n\nURL: %s") % (version, target_url),
                 type=MessageBox.TYPE_YESNO,
                 timeout=10,
-                default=True,
-                title=_("Update %s") % PN
+                default=True
             )
         except Exception as e:  # pylint: disable=broad-exception-caught
-            print("%s" % PN, str(e), updateUrl)
+            print("[%s] Download error %s at %s" % (PN, repr(e), target_url))
             onDownloadError(_("Update check failed: ") + str(e) + "\n\nURLs: %s, %s" % (updateUrl, str(target_url)))
 
     def updateDone(self, result=None):
@@ -267,6 +271,5 @@ class Scripts(Screen):
             MessageBox,
             _("Do you want to restart the GUI?"),
             type=MessageBox.TYPE_YESNO,
-            timeout=10,
-            title=_("Update finished")
+            timeout=10
         )
