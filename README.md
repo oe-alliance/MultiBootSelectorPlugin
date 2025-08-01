@@ -27,9 +27,9 @@
 
 ## 🖼️ Screenshots
 
-| OpenATV | OpenPLi | DreamOS | NewNigma2 |
-|---------|---------|---------|-----------|
-| ![OpenATV screenshot](screenshots/openatv.png) | ![OpenPLi screenshot](screenshots/openpli.png) | ![DreamOS screenshot](screenshots/dreamos.png) | ![NewNigma2 screenshot](screenshots/newnigma2.png) |
+| DreamOS | OpenPLi | VTI | NewNigma2 |
+|---------|---------|-----|-----------|
+| ![DreamOS screenshot](screenshots/dreamos.png) | ![OpenPLi screenshot](screenshots/openpli.png) | ![VTI screenshot](screenshots/vti.png) | ![NewNigma2 screenshot](screenshots/newnigma2.png) |
 
 ---
 
