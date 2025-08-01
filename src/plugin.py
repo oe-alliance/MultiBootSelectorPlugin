@@ -150,7 +150,7 @@ class Scripts(Screen):
 
                 if not self.slist or stderr:
                     self.slist = [slotEntry(-1, "Error: %s" % output_lines[-1])]
-        except Exception as e:  # pylint: disable=broad-exception-caught
+        except Exception as e:  # pylint: disable=broad-except
             self.slist = [slotEntry(-1, "Error: %s" % e)]
 
     def onLayoutFinished(self):
@@ -245,7 +245,7 @@ class Scripts(Screen):
                 if match(pattern, asset.get("name", "")):
                     target_url = str(asset.get("browser_download_url"))
                     break
-            print("[%s] Found version %s at %s" % (PN, version, target_url))
+            print("[%s] Found version %s at %s" % (PN, version, target_url))  # pylint: disable=superfluous-parens
 
             if not target_url:
                 onDownloadError(_("No suitable %s package found!" % installer["ext"]) + "\n\n%s.%s\n%s" % (pkgName, installer["ext"], str(json_dumps(filtered_assets, indent=2))))
@@ -261,8 +261,8 @@ class Scripts(Screen):
                 timeout=10,
                 default=True
             )
-        except Exception as e:  # pylint: disable=broad-exception-caught
-            print("[%s] Download error %s at %s" % (PN, repr(e), target_url))
+        except Exception as e:  # pylint: disable=broad-except
+            print("[%s] Download error %s at %s" % (PN, repr(e), target_url))  # pylint: disable=superfluous-parens
             onDownloadError(_("Update check failed: ") + str(e) + "\n\nURLs: %s, %s" % (updateUrl, str(target_url)))
 
     def updateDone(self, result=None):
