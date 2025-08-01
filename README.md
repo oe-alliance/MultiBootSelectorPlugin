@@ -5,7 +5,7 @@
 [![Build Status](https://github.com/oe-alliance/MultiBootSelectorPlugin/actions/workflows/release.yml/badge.svg)](https://github.com/oe-alliance/MultiBootSelectorPlugin/actions)
 [![Plugin Version](https://img.shields.io/github/v/tag/oe-alliance/MultiBootSelectorPlugin?label=Latest%20Version&color=darkviolet)](https://github.com/oe-alliance/MultiBootSelectorPlugin/tags)
 [![Latest Release](https://img.shields.io/github/release-date/oe-alliance/MultiBootSelectorPlugin?label=From&color=darkviolet)](https://github.com/oe-alliance/MultiBootSelectorPlugin/releases/latest)
-[![GitHub all releases](https://img.shields.io/github/downloads/oe-alliance/MultiBootSelectorPlugin/total.svg?label=Downloads&color=darkgrey)](https://github.com/oe-alliance/MultiBootSelectorPlugin/releases)
+[![GitHub all releases](https://img.shields.io/github/downloads/oe-alliance/MultiBootSelectorPlugin/total.svg?label=Downloads)](https://github.com/oe-alliance/MultiBootSelectorPlugin/releases)
 
 ## 📦 Overview
 
@@ -27,9 +27,9 @@
 
 ## 🖼️ Screenshots
 
-| OpenATV | OpenPLi | DreamOS | NewNigma2 |
-|---------|---------|---------|-----------|
-| ![OpenATV screenshot](screenshots/openatv.png) | ![OpenPLi screenshot](screenshots/openpli.png) | ![DreamOS screenshot](screenshots/dreamos.png) | ![NewNigma2 screenshot](screenshots/newnigma2.png) |
+| DreamOS | OpenPLi | VTI | NewNigma2 |
+|---------|---------|-----|-----------|
+| ![DreamOS screenshot](screenshots/dreamos.png) | ![OpenPLi screenshot](screenshots/openpli.png) | ![VTI screenshot](screenshots/vti.png) | ![NewNigma2 screenshot](screenshots/newnigma2.png) |
 
 ---
 
