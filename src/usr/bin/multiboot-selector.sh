@@ -144,11 +144,12 @@ image_info() {
     distro_file_enigma="$tmpdir$ROOT_SUBDIR/usr/lib/enigma.info"
     distro_file_image="$tmpdir$ROOT_SUBDIR/etc/image-version"
     distro_file_issue="$tmpdir$ROOT_SUBDIR/etc/issue"
-    local distro
+    distro_file_status=$(echo "$tmpdir$ROOT_SUBDIR"/var/lib/{d,o}pkg/status)
+    local distro date compiledate version pkg_version
     cmp -s "/boot/STARTUP" "/boot/$STARTUP_FILE" && current=' - Current' || current=''
 
     if [ -f "$enigma_file_binary" ]; then
-        e2date=$(stat -c %z "$enigma_file_binary" 2>/dev/null | cut -d ' ' -f 1 | xargs)
+        e2date=$(stat -c %y "$enigma_file_binary" 2>/dev/null | cut -d ' ' -f 1 | xargs)
         e2date="${e2date:-$(python -c "import os, time; print(time.strftime('%Y-%m-%d', time.localtime(os.path.getmtime('$enigma_file_binary'))))")}"
 
         if [ -f "$distro_file_enigma" ]; then
@@ -158,13 +159,20 @@ image_info() {
             date="${compiledate:0:4}-${compiledate:4:2}-${compiledate:6:2}"
         elif [ -f "$distro_file_image" ]; then
             distro=$(grep '^distro=' "$distro_file_image" | cut -d '=' -f 2 | xargs)
-            version=$(grep '^version=' "$distro_file_image" | cut -d '=' -f 2 | xargs)
         fi
+
+        for status_file in $distro_file_status; do
+            if [ -f "$status_file" ]; then
+                pkg_version=$(grep -A 8 '^Package: enigma2$' "$status_file" \
+                    | grep '^Version:' \
+                    | sed -E 's/^Version: //; s/\+.*//; s/-r[0-9.].*//')
+            fi
+        done
 
         date="${date:-$e2date}"
         distro="${distro:-$(head -n 1 "$distro_file_issue" | cut -d ' ' -f 1 | xargs)}"
         distro="${known_distros[$distro]:-$distro}"
-        version="${version:-$(head -n 1 "$distro_file_issue" | cut -d ' ' -f 2 | xargs)}"
+        version="${version:-$pkg_version}"
         IMAGE_INFO_RESULT="Slot $type: $(echo "$distro" "$version" | xargs) ($date)$current"
     else
         oem=$(basename "$STARTUP_FILE" | awk -F'_' '{print $NF}')
