@@ -104,6 +104,10 @@ detect_multiboot() {
     fi
 }
 
+strip_quotes() {
+    echo "$1" | sed "s/^'//; s/'$//" | xargs
+}
+
 image_info() {
     local idx=$1
     local MB_TYPE=$2
@@ -149,16 +153,16 @@ image_info() {
     cmp -s "/boot/STARTUP" "/boot/$STARTUP_FILE" && current=' - Current' || current=''
 
     if [ -f "$enigma_file_binary" ]; then
-        e2date=$(stat -c %y "$enigma_file_binary" 2>/dev/null | cut -d ' ' -f 1 | xargs)
+        e2date=$(strip_quotes "$(stat -c %y "$enigma_file_binary" 2>/dev/null | cut -d ' ' -f 1)")
         e2date="${e2date:-$(python -c "import os, time; print(time.strftime('%Y-%m-%d', time.localtime(os.path.getmtime('$enigma_file_binary'))))")}"
 
         if [ -f "$distro_file_enigma" ]; then
-            distro=$(grep '^distro=' "$distro_file_enigma" | cut -d '=' -f 2 | xargs)
-            version=$(grep '^imgversion=' "$distro_file_enigma" | cut -d '=' -f 2 | xargs)
-            compiledate=$(grep '^compiledate=' "$distro_file_enigma" | cut -d '=' -f 2 | xargs)
+            distro=$(strip_quotes "$(grep '^distro=' "$distro_file_enigma" | cut -d '=' -f 2)")
+            version=$(strip_quotes "$(grep '^imgversion=' "$distro_file_enigma" | cut -d '=' -f 2)")
+            compiledate=$(strip_quotes "$(grep '^compiledate=' "$distro_file_enigma" | cut -d '=' -f 2)")
             date="${compiledate:0:4}-${compiledate:4:2}-${compiledate:6:2}"
         elif [ -f "$distro_file_image" ]; then
-            distro=$(grep '^distro=' "$distro_file_image" | cut -d '=' -f 2 | xargs)
+            distro=$(strip_quotes "$(grep '^distro=' "$distro_file_image" | cut -d '=' -f 2)")
         fi
 
         for status_file in $distro_file_status; do
@@ -170,7 +174,7 @@ image_info() {
         done
 
         date="${date:-$e2date}"
-        distro="${distro:-$(head -n 1 "$distro_file_issue" | cut -d ' ' -f 1 | xargs)}"
+        distro="${distro:-$(strip_quotes "$(head -n 1 "$distro_file_issue" | cut -d ' ' -f 1)")}"
         distro="${known_distros[$distro]:-$distro}"
         version="${version:-$pkg_version}"
         IMAGE_INFO_RESULT="Slot $type: $(echo "$distro" "$version" | xargs) ($date)$current"
