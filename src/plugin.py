@@ -2,7 +2,7 @@
 #                                       #
 #   Basic Multiboot for Enigma2         #
 #   Support: No Support                 #
-#   Made by: Token & WXbet              #
+#   Made by: WXbet & Token              #
 #                                       #
 #########################################
 
@@ -85,6 +85,8 @@ class Scripts(Screen):
         self.title = "Select Boot Slot - Version %s" % PV
         self["header"] = Label(_("Boot device not found!"))
         self.session = session
+        self.jsonRelease = None
+        self.newVersion = PV
         self.slist = []
         self.currentIndex = 0
         self.reload_list()
@@ -158,6 +160,9 @@ class Scripts(Screen):
         self["list"].moveToIndex(self.currentIndex)
         # reload button images
         self.reloadButton(["red", "green", "yellow", "blue"])
+        # hide blue button
+        self["key_blue"].hide()
+        self["key_blue_pixmap"].hide()
 
     def reloadButton(self, colors):
         if isinstance(colors, str):
@@ -196,12 +201,20 @@ class Scripts(Screen):
         self.bootSelectedSlot()
 
     def yellowPressed(self):
+        self.jsonRelease = json_loads(urlopen(updateUrl, context=unverified_ssl()).read().decode("utf-8"))
+        self.newVersion = str(self.jsonRelease.get("tag_name"))
+        info = " to version {}".format(self.newVersion) if self.newVersion != PV else ""
         self.session.open(
             MessageBox,
-            _("For advanced features like slot management, please boot into the root image and use the provided MultiBoot Manager."),
+            _(
+                "For advanced features like slot management, please boot into the root image and use the provided MultiBoot Manager.\n\n"
+                "Hint: You can use the blue button to update the MultiBoot Selector plugin itself%s."
+            ) % info,
             type=MessageBox.TYPE_INFO,
             timeout=10
         )
+        self["key_blue"].show()
+        self["key_blue_pixmap"].show()
 
     def bluePressed(self):
         def onDownloadError(error):
@@ -214,7 +227,7 @@ class Scripts(Screen):
                 self.session.openWithCallback(
                     self.updateDone,
                     Console,
-                    _("Updating %s plugin to version %s..." % (PN, version)),
+                    _("Updating %s plugin to version %s..." % (PN, self.newVersion)),
                     cmdlist=["echo %s" % cmd, cmd],
                     closeOnSuccess=False
                 )
@@ -226,12 +239,12 @@ class Scripts(Screen):
                 )
 
         try:
+            if not self["key_blue"].instance.isVisible():
+                return
             target_url = None
-            release = json_loads(urlopen(updateUrl, context=unverified_ssl()).read().decode("utf-8"))
-            version = str(release.get("tag_name"))
-            assets = release.get("assets", [])
+            assets = self.jsonRelease.get("assets", [])
             installer = {"cmd": "dpkg -i --force-downgrade", "ext": "deb"} if fileExists("/usr/bin/apt") else {"cmd": "opkg install --force-reinstall", "ext": "ipk"}
-            pkgName = pkgSearchName % version
+            pkgName = pkgSearchName % self.newVersion
 
             filtered_assets = [
                 {
@@ -245,7 +258,7 @@ class Scripts(Screen):
                 if match(pattern, asset.get("name", "")):
                     target_url = str(asset.get("browser_download_url"))
                     break
-            print("[%s] Found version %s at %s" % (PN, version, target_url))  # pylint: disable=superfluous-parens
+            print("[%s] Found version %s at %s" % (PN, self.newVersion, target_url))  # pylint: disable=superfluous-parens
 
             if not target_url:
                 onDownloadError(_("No suitable %s package found!" % installer["ext"]) + "\n\n%s.%s\n%s" % (pkgName, installer["ext"], str(json_dumps(filtered_assets, indent=2))))
@@ -256,7 +269,7 @@ class Scripts(Screen):
             self.session.openWithCallback(
                 doPluginUpdate,
                 MessageBox,
-                _("Do you want to update to latest version %s?\n\nURL: %s") % (version, target_url),
+                _("Do you want to update to latest version %s?\n\nURL: %s") % (self.newVersion, target_url),
                 type=MessageBox.TYPE_YESNO,
                 timeout=10,
                 default=True
