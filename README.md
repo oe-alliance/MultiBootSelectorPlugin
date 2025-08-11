@@ -1,11 +1,11 @@
 # Legacy MultiBoot Selector Plugin for Enigma2
 
 [![License: GPLv3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0.html#license-text)
-[![Lint Status](https://github.com/oe-alliance/MultiBootSelectorPlugin/actions/workflows/lint.yml/badge.svg)](https://github.com/oe-alliance/MultiBootSelectorPlugin/actions)
-[![Build Status](https://github.com/oe-alliance/MultiBootSelectorPlugin/actions/workflows/release.yml/badge.svg)](https://github.com/oe-alliance/MultiBootSelectorPlugin/actions)
+[![Lint Status](https://github.com/oe-alliance/MultiBootSelectorPlugin/actions/workflows/lint.yml/badge.svg)](https://github.com/oe-alliance/MultiBootSelectorPlugin/actions/workflows/lint.yml)
+[![Build Status](https://github.com/oe-alliance/MultiBootSelectorPlugin/actions/workflows/release.yml/badge.svg)](https://github.com/oe-alliance/MultiBootSelectorPlugin/actions/workflows/release.yml)
 [![Plugin Version](https://img.shields.io/github/v/tag/oe-alliance/MultiBootSelectorPlugin?label=Latest%20Version&color=darkviolet)](https://github.com/oe-alliance/MultiBootSelectorPlugin/tags)
 [![Latest Release](https://img.shields.io/github/release-date/oe-alliance/MultiBootSelectorPlugin?label=From&color=darkviolet)](https://github.com/oe-alliance/MultiBootSelectorPlugin/releases/latest)
-[![GitHub all releases](https://img.shields.io/github/downloads/oe-alliance/MultiBootSelectorPlugin/total.svg?label=Downloads)](https://github.com/oe-alliance/MultiBootSelectorPlugin/releases)
+[![GitHub all releases](https://img.shields.io/github/downloads/oe-alliance/MultiBootSelectorPlugin/total.svg?label=Downloads&color=blue)](https://github.com/oe-alliance/MultiBootSelectorPlugin/releases)
 
 ## 📦 Overview
 
