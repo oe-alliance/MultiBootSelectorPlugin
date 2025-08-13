@@ -16,6 +16,8 @@ from re import match, escape
 from collections import namedtuple
 from ssl import _create_unverified_context as unverified_ssl
 from json import loads as json_loads, dumps as json_dumps
+from datetime import datetime
+from time import localtime
 
 try:
     from Components.SystemInfo import BoxInfo
@@ -87,6 +89,7 @@ class Scripts(Screen):
         self.session = session
         self.jsonRelease = None
         self.newVersion = PV
+        self.updateEnabled = False
         self.slist = []
         self.currentIndex = 0
         self.reload_list()
@@ -112,7 +115,6 @@ class Scripts(Screen):
             "blue": self.bluePressed,
         }, -1)
 
-        self.updateButtons()
         self["list"].onSelectionChanged.append(self.updateButtons)
         self.onLayoutFinish.append(self.onLayoutFinished)
 
@@ -160,9 +162,8 @@ class Scripts(Screen):
         self["list"].moveToIndex(self.currentIndex)
         # reload button images
         self.reloadButton(["red", "green", "yellow", "blue"])
-        # hide blue button
-        self["key_blue"].hide()
-        self["key_blue_pixmap"].hide()
+        # show/hide buttons
+        self.updateButtons()
 
     def reloadButton(self, colors):
         if isinstance(colors, str):
@@ -184,10 +185,13 @@ class Scripts(Screen):
                     pixmap.instance.setPixmapFromFile(path)
                     break
 
-    def updateButtons(self):
+    def updateButtons(self, result=None):
         current = self["list"].getCurrent() or ""
         func = "hide" if not current or any(x in current for x in ("Empty", "Error:")) else "show"
         for widget in ("key_green", "key_green_pixmap"):
+            getattr(self[widget], func)()
+        func = "hide" if not self.updateEnabled else "show"
+        for widget in ("key_blue", "key_blue_pixmap"):
             getattr(self[widget], func)()
 
     def restartGUI(self, mode=None, result=None):
@@ -201,10 +205,12 @@ class Scripts(Screen):
         self.bootSelectedSlot()
 
     def yellowPressed(self):
+        self.updateEnabled = True
         self.jsonRelease = json_loads(urlopen(updateUrl, context=unverified_ssl()).read().decode("utf-8"))
-        self.newVersion = str(self.jsonRelease.get("tag_name"))
+        self.newVersion = str(self.jsonRelease.get("name"))
         info = " to version {}".format(self.newVersion) if self.newVersion != PV else ""
-        self.session.open(
+        self.session.openWithCallback(
+            self.updateButtons,
             MessageBox,
             _(
                 "For advanced features like slot management, please boot into the root image and use the provided MultiBoot Manager.\n\n"
@@ -213,10 +219,18 @@ class Scripts(Screen):
             type=MessageBox.TYPE_INFO,
             timeout=10
         )
-        self["key_blue"].show()
-        self["key_blue_pixmap"].show()
 
     def bluePressed(self):
+        def format_date(date_str, out_fmt="%Y-%m-%d %H:%M:%S"):
+            # parse the UTC time
+            utc_dt = datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%SZ")
+            # convert to timestamp
+            timestamp = (utc_dt - datetime(1970,1,1)).total_seconds()
+            # convert to local time struct, handles Daylight Saving Time (DST)
+            local_struct = localtime(timestamp)
+            # convert back to datetime and format
+            return datetime(*local_struct[:6]).strftime(out_fmt)
+
         def onDownloadError(error):
             message = error.getErrorMessage() if hasattr(error, "getErrorMessage") else str(error)
             self.session.open(MessageBox, message, MessageBox.TYPE_ERROR)
@@ -242,6 +256,7 @@ class Scripts(Screen):
             if not self["key_blue"].instance.isVisible():
                 return
             target_url = None
+            prerelease = str(self.jsonRelease.get("prerelease", "false")).lower() == "true"
             assets = self.jsonRelease.get("assets", [])
             installer = {"cmd": "dpkg -i --force-downgrade", "ext": "deb"} if fileExists("/usr/bin/apt") else {"cmd": "opkg install --force-reinstall", "ext": "ipk"}
             pkgName = pkgSearchName % self.newVersion
@@ -249,7 +264,11 @@ class Scripts(Screen):
             filtered_assets = [
                 {
                     "name": asset.get("name", ""),
-                    "browser_download_url": asset.get("browser_download_url")
+                    "size": asset.get("size", 0),
+                    "digest": asset.get("digest", ""),
+                    "download_count": asset.get("download_count", 0),
+                    "updated_at": asset.get("updated_at", ""),
+                    "browser_download_url": asset.get("browser_download_url", "")
                 }
                 for asset in assets
             ]
@@ -257,6 +276,13 @@ class Scripts(Screen):
                 pattern = r"^%s\.%s$" % (escape(pkgName), escape(installer["ext"]))
                 if match(pattern, asset.get("name", "")):
                     target_url = str(asset.get("browser_download_url"))
+                    release_info = {
+                        "release": "pre-" if prerelease else "",
+                        "file_date": format_date(str(asset.get("updated_at"))),
+                        "file_size": round(float(asset.get("size")) / 1024, 2),
+                        "file_downloads": str(asset.get("download_count")),
+                        "sha": str(asset.get("digest")).split(":")
+                    }
                     break
             print("[%s] Found version %s at %s" % (PN, self.newVersion, target_url))  # pylint: disable=superfluous-parens
 
@@ -269,9 +295,25 @@ class Scripts(Screen):
             self.session.openWithCallback(
                 doPluginUpdate,
                 MessageBox,
-                _("Do you want to update to latest version %s?\n\nURL: %s") % (self.newVersion, target_url),
+                _(
+                    "Do you want to update to latest %srelease version %s?\n\n"
+                    "Release date: %s\n"
+                    "Package size: %.2f KB\n"
+                    "GitHub downloads: %s\n\n"
+                    "URL:\n%s\n\n"
+                    "Checksum (%s):\n%s"
+                ) % (
+                    release_info["release"],
+                    self.newVersion,
+                    release_info["file_date"],
+                    release_info["file_size"],
+                    release_info["file_downloads"],
+                    target_url,
+                    release_info["sha"][0],
+                    release_info["sha"][-1]
+                ),
                 type=MessageBox.TYPE_YESNO,
-                timeout=10,
+                timeout=15,
                 default=True
             )
         except Exception as e:  # pylint: disable=broad-except
