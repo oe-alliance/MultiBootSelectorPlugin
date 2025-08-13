@@ -77,8 +77,9 @@ Once the plugin is installed, you can update to the latest GitHub release direct
 
 To update:
 1. Open the plugin
-2. Press the blue button
-3. Confirm update when prompted
+2. Press the yellow button to activate the blue update button
+3. Press the blue button to show available updates
+4. Confirm update when prompted
 
 The plugin will automatically fetch the latest release from GitHub and install it.
 
