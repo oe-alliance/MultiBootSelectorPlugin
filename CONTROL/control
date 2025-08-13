@@ -1,5 +1,5 @@
 Package: enigma2-plugin-extensions-multibootselector
-Version: 1.15
+Version: 1.16
 Description: Basic python frontend for multiboot-selector.sh to simply select the slot to boot from.
 Architecture: all
 Section: extra
