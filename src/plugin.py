@@ -225,7 +225,7 @@ class Scripts(Screen):
             # parse the UTC time
             utc_dt = datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%SZ")
             # convert to timestamp
-            timestamp = (utc_dt - datetime(1970,1,1)).total_seconds()
+            timestamp = (utc_dt - datetime(1970, 1, 1)).total_seconds()
             # convert to local time struct, handles Daylight Saving Time (DST)
             local_struct = localtime(timestamp)
             # convert back to datetime and format
