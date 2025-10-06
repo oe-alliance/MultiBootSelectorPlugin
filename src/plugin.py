@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 #########################################
 #                                       #
 #   Basic Multiboot for Enigma2         #
@@ -12,7 +13,7 @@ except ImportError:
     from urllib2 import urlopen
 from os.path import isfile
 from subprocess import Popen, PIPE
-from re import match, escape
+from re import match, escape, search, sub
 from collections import namedtuple
 from ssl import _create_unverified_context as unverified_ssl
 from json import loads as json_loads, dumps as json_dumps
@@ -27,10 +28,12 @@ except (ImportError, AttributeError):
 from Components.ActionMap import ActionMap
 from Components.Button import Button
 from Components.Label import Label
+from Components.Input import Input
 from Components.MenuList import MenuList
 from Components.Pixmap import Pixmap
 from Plugins.Plugin import PluginDescriptor
 from Screens.Console import Console
+from Screens.InputBox import InputBox
 from Screens.MessageBox import MessageBox
 from Screens.Screen import Screen
 from Screens.Standby import TryQuitMainloop
@@ -89,7 +92,6 @@ class Scripts(Screen):
         self.session = session
         self.jsonRelease = None
         self.newVersion = PV
-        self.updateEnabled = False
         self.slist = []
         self.currentIndex = 0
         self.reload_list()
@@ -101,7 +103,7 @@ class Scripts(Screen):
         self["key_red_pixmap"] = Pixmap()
         self["key_green"] = Button(_("Restart"))
         self["key_green_pixmap"] = Pixmap()
-        self["key_yellow"] = Button(_("More"))
+        self["key_yellow"] = Button(_("Rename"))
         self["key_yellow_pixmap"] = Pixmap()
         self["key_blue"] = Button(_("Update"))
         self["key_blue_pixmap"] = Pixmap()
@@ -128,6 +130,7 @@ class Scripts(Screen):
         self.session.openWithCallback(lambda *args: self.restartGUI(mode=2, result=args[0] if args else None), Console, slot_name, cmdlist=[slot_cmd], closeOnSuccess=True)
 
     def reload_list(self):
+        self.slist = []
         output_lines = []
 
         try:
@@ -188,15 +191,56 @@ class Scripts(Screen):
     def updateButtons(self, result=None):
         current = self["list"].getCurrent() or ""
         func = "hide" if not current or any(x in current for x in ("Empty", "Error:")) else "show"
-        for widget in ("key_green", "key_green_pixmap"):
-            getattr(self[widget], func)()
-        func = "hide" if not self.updateEnabled else "show"
-        for widget in ("key_blue", "key_blue_pixmap"):
+        for widget in ("key_green", "key_green_pixmap", "key_yellow", "key_yellow_pixmap"):
             getattr(self[widget], func)()
 
     def restartGUI(self, mode=None, result=None):
         if result or result is None:
             self.session.open(TryQuitMainloop, mode)
+
+    def onEditSlotName(self, new_slot_name):
+        if new_slot_name is None:
+            return
+        new_slot_name = new_slot_name.strip()
+
+        current_label = self["list"].getCurrent()
+        slot = next((s for s in self.slist if s.label == current_label), None)
+        if not slot:
+            return
+
+        # Replace only text between ':' and '(' — keep everything else unchanged
+        updated_label = sub(r"(:\s*)(.*?)(\s*\()", r"\1%s\3" % new_slot_name, slot.label)
+        updated_entry = slotEntry(slot.index, updated_label)
+        idx = self.slist.index(slot)
+        self.slist[idx] = updated_entry
+
+        rename_success = True
+        try:
+            if isfile(slotCmd):
+                rename_cmd = "%s rename %s '%s'" % (slotCmd, slot.index, new_slot_name)
+                stderr = Popen(rename_cmd, shell=True, stdout=PIPE, stderr=PIPE, universal_newlines=True).communicate()[1]
+                if stderr:
+                    rename_success = False
+                    self.session.open(MessageBox, _("Error while renaming slot:\n%s") % stderr, MessageBox.TYPE_ERROR)
+        except Exception as e:  # pylint: disable=broad-except
+            rename_success = False
+            self.session.open(MessageBox, _("Rename failed:\n%s") % e, MessageBox.TYPE_ERROR)
+
+        # Reload slot list from the system if rename succeeded
+        if rename_success:
+            try:
+                self.slist = []  # clear old list to avoid duplication
+                self.reload_list()
+                self["list"].setList([s.label for s in self.slist])
+                self["list"].moveToIndex(idx)
+                if not new_slot_name:
+                    self.session.open(MessageBox, _("Slot name was reset to default."), MessageBox.TYPE_INFO, timeout=3)
+            except Exception as e:  # pylint: disable=broad-except
+                self.session.open(MessageBox, _("Slot renamed but reload failed:\n%s") % e, MessageBox.TYPE_WARNING)
+        else:
+            # Fallback: keep local updated label if rename failed
+            self["list"].setList([s.label for s in self.slist])
+            self["list"].moveToIndex(idx)
 
     def redPressed(self):
         self.close()
@@ -205,19 +249,26 @@ class Scripts(Screen):
         self.bootSelectedSlot()
 
     def yellowPressed(self):
-        self.updateEnabled = True
-        self.jsonRelease = json_loads(urlopen(updateUrl, context=unverified_ssl()).read().decode("utf-8"))
-        self.newVersion = str(self.jsonRelease.get("name"))
-        info = " to version {}".format(self.newVersion) if self.newVersion != PV else ""
+        current = self["list"].getCurrent()
+        if not current or "Error" in current or "Empty" in current:
+            return
+
+        m = search(r"Slot\s+'([^']+)'\s+([\w\-]+):\s*(.*?)\s*\(", current)
+        if not m:
+            self.session.open(MessageBox, _("No valid slot entry found."), MessageBox.TYPE_ERROR)
+            return
+
+        slot_num, slot_type, slot_name = m.groups()
+        slot_name = slot_name.strip()
+
+        title_text = _("Enter new name for Slot '%s' %s (leave empty to reset):") % (slot_num, slot_type)
+
         self.session.openWithCallback(
-            self.updateButtons,
-            MessageBox,
-            _(
-                "For advanced features like slot management, please boot into the root image and use the provided MultiBoot Manager.\n\n"
-                "Hint: You can use the blue button to update the MultiBoot Selector plugin itself%s."
-            ) % info,
-            type=MessageBox.TYPE_INFO,
-            timeout=10
+            self.onEditSlotName,
+            InputBox,
+            title=title_text,
+            text=slot_name,
+            type=Input.TEXT
         )
 
     def bluePressed(self):
@@ -256,6 +307,8 @@ class Scripts(Screen):
             if not self["key_blue"].instance.isVisible():
                 return
             target_url = None
+            self.jsonRelease = json_loads(urlopen(updateUrl, context=unverified_ssl()).read().decode("utf-8"))
+            self.newVersion = str(self.jsonRelease.get("name"))
             prerelease = str(self.jsonRelease.get("prerelease", "false")).lower() == "true"
             assets = self.jsonRelease.get("assets", [])
             installer = {"cmd": "dpkg -i --force-downgrade", "ext": "deb"} if fileExists("/usr/bin/apt") else {"cmd": "opkg install --force-reinstall", "ext": "ipk"}
