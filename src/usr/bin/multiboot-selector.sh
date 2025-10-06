@@ -1,19 +1,37 @@
 #!/bin/bash
 
-# =================================================================
+# ======================================================================
 # Multiboot Selector - BusyBox Compatible Version
-# =================================================================
+# ======================================================================
 #
-# This script allows you to select a different Multiboot image
-# by updating the STARTUP file on OpenATV devices.
+# This script lets you manage and switch Multiboot images by updating
+# the STARTUP file on supported Enigma2 devices.
 #
-# It dynamically detects available STARTUP and STARTUP_* files
-# and validates images by mounting their corresponding root device.
+# It auto-detects available STARTUP / STARTUP_* files and validates
+# images by mounting their corresponding root devices.
 #
-# You can pass a slot index via parameter to avoid user interaction
-# or pass 'list' to get only the list of available slots.
-# 
-# =================================================================
+# Behavior:
+#   • If a slot has no '/usr/lib/enigma.conf' file in its root device, one is
+#     automatically created with the detected default image information.
+#
+# Usage:
+#   • No parameters
+#       → Starts an interactive menu to choose a slot. No reboot.
+#
+#   • list
+#       → Prints the list of available slots. For automation.
+#
+#   • <slot_number>
+#       → Changes the boot image to the given slot by copying its
+#         STARTUP file to /boot/STARTUP.  No reboot.
+#
+#   • rename <slot_number> <new_name>
+#       → Sets a custom display name for the slot (writes to /usr/lib/enigma.conf).
+#
+#   • rename <slot_number>
+#       → Resets the slot name to default (deletes /usr/lib/enigma.conf).
+#
+# ======================================================================
 
 echo "Multiboot Selector - Starting..."
 
@@ -36,8 +54,9 @@ declare -A known_distros=(
     ["vti"]="VTi"
     ["newnigma2"]="Newnigma2"
     ["pure2"]="PurE2"
-    ["Dreambox"]="DreamOS"
+    ["dreambox"]="DreamOS"
     ["opendreambox"]="OpenDreambox"
+    ["gp"]="GeminiProject"
     ["unknown"]="Unknown Distro"
 )
 
@@ -108,6 +127,101 @@ strip_quotes() {
     echo "$1" | sed "s/^'//; s/'$//" | xargs
 }
 
+rename_slot() {
+    local slot_number="$1"
+    local new_name="$2"
+
+    if [ -z "$slot_number" ]; then
+        echo "Usage: $0 rename <slot_number> [<new_name>]"
+        echo "If <new_name> is omitted, the slot name will be reset (deletes /usr/lib/enigma.conf)."
+        exit 1
+    fi
+
+    local found=false
+    for FILE in $(ls -v /boot/STARTUP_*); do
+        [ -r "$FILE" ] || continue
+        [[ "$FILE" == *DISABLE* ]] && continue
+
+        local slot_id
+        slot_id=$(basename "$FILE" | awk -F'_' '{if ($NF~/^[0-9]+$/)print $NF;else print substr($NF,1,1)}')
+        [ "$slot_id" = "$slot_number" ] || continue
+        found=true
+
+        # --- extract boot parameters ---
+        local ROOT="" ROOTSUBDIR="" ROOTFSTYPE=""
+        while IFS= read -r line || [ -n "$line" ]; do
+            ROOT=$(echo "$line" | sed -n 's/.*root=\([^ ]*\).*/\1/p')
+            ROOTSUBDIR=$(echo "$line" | sed -n 's/.*rootsubdir=\([^ ]*\).*/\1/p')
+            ROOTFSTYPE=$(echo "$line" | sed -n 's/.*rootfstype=\([^ ]*\).*/\1/p')
+        done < "$FILE"
+
+        # --- mount slot safely ---
+        local tmpdir
+        tmpdir=$(mount_slot "$ROOT" "$ROOTFSTYPE") || {
+            echo "Cannot mount $ROOT – rename/reset aborted."
+            exit 1
+        }
+
+        local distro_file_info="$tmpdir$ROOTSUBDIR/usr/lib/enigma.info"
+        local distro_file_conf="$tmpdir$ROOTSUBDIR/usr/lib/enigma.conf"
+
+        # --- perform reset or rename ---
+        if [ -z "$new_name" ]; then
+            # RESET MODE
+            if [ -f "$distro_file_info" ]; then
+                sed -i '/^displaydistro=/d; /^imgversion=/d' "$distro_file_conf" 2>/dev/null
+                grep -q "^origin='multiboot-selector.sh'" "$distro_file_info" && rm "$distro_file_info" 2>/dev/null
+                echo "Cleaned displaydistro/imgversion from enigma.conf."
+            fi
+
+            echo "Reset name of slot $slot_number."
+        else
+            # RENAME MODE
+            if [ -f "$distro_file_info" ]; then
+            local distro="${new_name% *}"                                  # everything before the last space
+            [[ "$new_name" == *" "* ]] && local version="${new_name##* }"  # only set version if there's a space
+                grep -q '^displaydistro=' "$distro_file_conf" 2>/dev/null && \
+                    sed -i "s|^displaydistro=.*|displaydistro='$distro'|" "$distro_file_conf" || \
+                    echo "displaydistro='$distro'" >> "$distro_file_conf"
+
+                grep -q '^imgversion=' "$distro_file_conf" 2>/dev/null && \
+                    sed -i "s|^imgversion=.*|imgversion='$version'|" "$distro_file_conf" || \
+                    echo "imgversion='$version'" >> "$distro_file_conf"
+            fi
+            echo "Renamed slot $slot_number to '$new_name'."
+        fi
+
+        unmount_slot "$tmpdir"
+        exit 0
+    done
+
+    $found || echo "Invalid selection: $slot_number"
+    exit 1
+}
+
+mount_slot() {
+    # usage: mount_slot <partition> <fstype>
+    local part="$1" fstype="$2" tmpdir
+    tmpdir="$(mktemp -d)/"
+    local opts=()
+    [ "$fstype" = "ubifs" ] || [ "$fstype" = "ext4" ] && opts=(-t "$fstype")
+    if mount "${opts[@]}" "$part" "$tmpdir" 2>/dev/null; then
+        echo "$tmpdir"
+    else
+        echo ""
+        rm -rf "$tmpdir"
+        return 1
+    fi
+}
+
+unmount_slot() {
+    # usage: unmount_slot <mountpoint>
+    local dir="$1"
+    sync
+    mountpoint -q "$dir" && umount -f "$dir" &>/dev/null
+    rm -rf "$dir"
+}
+
 image_info() {
     local idx=$1
     local MB_TYPE=$2
@@ -117,17 +231,17 @@ image_info() {
     STARTUP_FILE="${STARTUP_FILES[$idx]}"
     IMAGE_INFO_RESULT=""
 
+    # --- mount only if changed ---
     if [ "$ROOT_PARTITION" != "$LAST_ROOT_PARTITION" ]; then
-        mountpoint -q "$LAST_TMPDIR" && umount -f "$LAST_TMPDIR" &>/dev/null && rm -rf "$LAST_TMPDIR"
-
-        tmpdir="$(mktemp -d)/"
-        [ "$ROOTFS_TYPE" == "ubifs" ] || [ "$ROOTFS_TYPE" == "ext4" ] && mount_options=(-t "$ROOTFS_TYPE")
-        mount "${mount_options[@]}" "$ROOT_PARTITION" "$tmpdir" &>/dev/null
-
+        unmount_slot "$LAST_TMPDIR"
+        tmpdir=$(mount_slot "$ROOT_PARTITION" "$ROOTFS_TYPE") || return
         LAST_ROOT_PARTITION="$ROOT_PARTITION"
         LAST_TMPDIR="$tmpdir"
+    else
+        tmpdir="$LAST_TMPDIR"
     fi
 
+    # --- determine slot type ---
     if [[ "$STARTUP_FILE" == *FLASH* ]] && [ "$ROOTFS_TYPE" == "ubifs" ]; then
         type="UBI"
     elif [[ "$STARTUP_FILE" == *FLASH* ]]; then
@@ -144,25 +258,36 @@ image_info() {
         type="USB"
     fi
 
-    enigma_file_binary="$tmpdir$ROOT_SUBDIR/usr/bin/enigma2"
-    distro_file_enigma="$tmpdir$ROOT_SUBDIR/usr/lib/enigma.info"
-    distro_file_image="$tmpdir$ROOT_SUBDIR/etc/image-version"
-    distro_file_issue="$tmpdir$ROOT_SUBDIR/etc/issue"
+    # --- collect paths ---
+    local enigma_file_binary="$tmpdir$ROOT_SUBDIR/usr/bin/enigma2"
+    local distro_file_info="$tmpdir$ROOT_SUBDIR/usr/lib/enigma.info"
+    local distro_file_conf="$tmpdir$ROOT_SUBDIR/usr/lib/enigma.conf"
+    local distro_file_version="$tmpdir$ROOT_SUBDIR/etc/image-version"
+    local distro_file_issue="$tmpdir$ROOT_SUBDIR/etc/issue"
     distro_file_status=$(echo "$tmpdir$ROOT_SUBDIR"/var/lib/{d,o}pkg/status)
-    local distro date compiledate version pkg_version
+    local distro date e2date compiledate version pkg_version
     cmp -s "/boot/STARTUP" "/boot/$STARTUP_FILE" && current=' - Current' || current=''
 
     if [ -f "$enigma_file_binary" ]; then
         e2date=$(strip_quotes "$(stat -c %y "$enigma_file_binary" 2>/dev/null | cut -d ' ' -f 1)")
         e2date="${e2date:-$(python -c "import os, time; print(time.strftime('%Y-%m-%d', time.localtime(os.path.getmtime('$enigma_file_binary'))))")}"
+    fi
 
-        if [ -f "$distro_file_enigma" ]; then
-            distro=$(strip_quotes "$(grep '^distro=' "$distro_file_enigma" | cut -d '=' -f 2)")
-            version=$(strip_quotes "$(grep '^imgversion=' "$distro_file_enigma" | cut -d '=' -f 2)")
-            compiledate=$(strip_quotes "$(grep '^compiledate=' "$distro_file_enigma" | cut -d '=' -f 2)")
-            date="${compiledate:0:4}-${compiledate:4:2}-${compiledate:6:2}"
-        elif [ -f "$distro_file_image" ]; then
-            distro=$(strip_quotes "$(grep '^distro=' "$distro_file_image" | cut -d '=' -f 2)")
+    if [ -f "$distro_file_conf" ] && grep -q '^displaydistro=' "$distro_file_conf" && grep -q '^imgversion=' "$distro_file_conf"; then
+        distro=$(strip_quotes "$(grep '^displaydistro=' "$distro_file_conf" | cut -d '=' -f 2)")
+        version=$(strip_quotes "$(grep '^imgversion=' "$distro_file_conf" | cut -d '=' -f 2)")
+        IMAGE_INFO_RESULT="Slot $type: ${distro}${version:+ $version} ($e2date)$current"
+    elif [ -f "$enigma_file_binary" ]; then
+        if [ -f "$distro_file_info" ]; then
+            distro=$(strip_quotes "$(grep '^displaydistro=' "$distro_file_info" | cut -d '=' -f 2)")
+            version=$(strip_quotes "$(grep '^imgversion=' "$distro_file_info" | cut -d '=' -f 2)")
+            compiledate=$(strip_quotes "$(grep '^compiledate=' "$distro_file_info" | cut -d '=' -f 2)")
+        elif [ -f "$distro_file_version" ]; then
+            distro=$(strip_quotes "$(grep '^distro=' "$distro_file_version" | cut -d '=' -f 2)")
+            distro="${distro:-$(strip_quotes "$(grep "Project" "${distro_file_issue}.net" | sed 's/[*]//g' | sed 's/^ *//;s/ *$//')")}"
+            # shellcheck disable=SC2001
+            version=$(strip_quotes "$(echo "$distro" | sed 's/[^0-9\.]*\([0-9]\+\.[0-9]\+\).*/\1/')")
+            [[ "$distro" == *Gemini* ]] && distro="gp"
         fi
 
         for status_file in $distro_file_status; do
@@ -173,11 +298,22 @@ image_info() {
             fi
         done
 
-        date="${date:-$e2date}"
+        [ -n "$compiledate" ] && date="${compiledate:0:4}-${compiledate:4:2}-${compiledate:6:2}" || date="$e2date"
         distro="${distro:-$(strip_quotes "$(head -n 1 "$distro_file_issue" | cut -d ' ' -f 1)")}"
-        distro="${known_distros[$distro]:-$distro}"
+        distro_key=$(echo "$distro" | tr '[:upper:]' '[:lower:]')
+        distro="${known_distros[$distro_key]:-$distro}"
         version="${version:-$pkg_version}"
         IMAGE_INFO_RESULT="Slot $type: $(echo "$distro" "$version" | xargs) ($date)$current"
+
+        if [ ! -f "$distro_file_info" ]; then
+            {
+                printf "displaydistro='%s'\n" "$distro"
+                printf "imgversion='%s'\n" "$version"
+                printf "imgrevision='%s'\n" ""
+                printf "compiledate='%s'\n" "${date//-/}"
+                printf "origin='%s'\n" "multiboot-selector.sh"
+            } > "$distro_file_info"
+        fi
     else
         oem=$(basename "$STARTUP_FILE" | awk -F'_' '{print $NF}')
         [[ "$oem" =~ ^[0-9]+$ ]] && distro="Empty" || distro="$oem OEM"
@@ -214,6 +350,11 @@ fi
 (echo 0 > /sys/block/mmcblk0boot1/force_ro) 2>/dev/null
 mkdir -p /boot 2>/dev/null
 mount -t "$BOOTFS_TYPE" "$BOOT" /boot 2>/dev/null
+
+# --- handle rename command early ---------------------------------------------
+if [ "$1" = "rename" ]; then
+    rename_slot "$2" "$3"
+fi
 
 idx=0
 for FILE in $(ls -v /boot/STARTUP_*); do
