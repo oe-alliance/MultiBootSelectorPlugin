@@ -137,8 +137,8 @@ class Scripts(Screen):
             if not path.isfile(slotCmd):
                 self.slist = [slotEntry(-1, _("Error: File '%s' is not available!") % slotCmd)]
             else:
-                process = Popen([slotCmd, "list"], stdout=PIPE, stderr=PIPE, universal_newlines=True)
-                stdout, stderr = process.communicate()
+                process = Popen([slotCmd, "list"], stdout=PIPE, universal_newlines=True)
+                stdout = process.communicate()[0]
 
                 for line in stdout.splitlines():
                     line = line.rstrip()
@@ -155,8 +155,9 @@ class Scripts(Screen):
                             self.currentIndex = len(self.slist) - 1
                     output_lines.append(line)
 
-                if not self.slist or stderr:
-                    self.slist = [slotEntry(-1, "Error: %s" % output_lines[-1])]
+                if not self.slist:
+                    error_msg = output_lines[-1] if output_lines else "No slots found"
+                    self.slist = [slotEntry(-1, "Error: %s" % error_msg)]
         except Exception as e:  # pylint: disable=broad-except
             self.slist = [slotEntry(-1, "Error: %s" % e)]
 
@@ -183,9 +184,9 @@ class Scripts(Screen):
             if not pixmap:
                 continue
             for path_template in skin_paths:
-                path = resolveFilename(SCOPE_SKIN_IMAGE, path_template.format(color))
-                if fileExists(path):
-                    pixmap.instance.setPixmapFromFile(path)
+                resolved_path = resolveFilename(SCOPE_SKIN_IMAGE, path_template.format(color))
+                if fileExists(resolved_path):
+                    pixmap.instance.setPixmapFromFile(resolved_path)
                     break
 
     def updateButtons(self, result=None):
@@ -198,7 +199,7 @@ class Scripts(Screen):
         if result or result is None:
             self.session.open(TryQuitMainloop, mode)
 
-    def onEditSlotName(self, new_slot_name):
+    def onEditSlotName(self, new_slot_name):  # pylint: disable=too-many-branches
         if new_slot_name is None:
             return
         new_slot_name = new_slot_name.strip()
@@ -206,6 +207,15 @@ class Scripts(Screen):
         current_label = self["list"].getCurrent()
         slot = next((s for s in self.slist if s.label == current_label), None)
         if not slot:
+            return
+
+        # Validate slot index
+        try:
+            slot_index = int(slot.index)
+            if slot_index < 0:
+                raise ValueError("Invalid slot index")
+        except (ValueError, TypeError):
+            self.session.open(MessageBox, _("Invalid slot index"), MessageBox.TYPE_ERROR)
             return
 
         # Replace only text between ':' and '(' — keep everything else unchanged
@@ -217,11 +227,18 @@ class Scripts(Screen):
         rename_success = True
         try:
             if path.isfile(slotCmd):
-                rename_cmd = "%s rename %s '%s'" % (slotCmd, slot.index, new_slot_name)
-                stderr = Popen(rename_cmd, shell=True, stdout=PIPE, stderr=PIPE, universal_newlines=True).communicate()[1]
-                if stderr:
+                # Use list form to avoid shell injection
+                process = Popen(
+                    [slotCmd, "rename", str(slot_index), new_slot_name],
+                    stdout=PIPE,
+                    universal_newlines=True
+                )
+                stdout = process.communicate()[0]
+
+                if process.returncode != 0:
                     rename_success = False
-                    self.session.open(MessageBox, _("Error while renaming slot:\n%s") % stderr, MessageBox.TYPE_ERROR)
+                    error_msg = stdout.strip() or "Unknown error (exit code %d)" % process.returncode
+                    self.session.open(MessageBox, _("Error while renaming slot:\n%s") % error_msg, MessageBox.TYPE_ERROR)
         except Exception as e:  # pylint: disable=broad-except
             rename_success = False
             self.session.open(MessageBox, _("Rename failed:\n%s") % e, MessageBox.TYPE_ERROR)
@@ -231,8 +248,16 @@ class Scripts(Screen):
             try:
                 self.slist = []  # clear old list to avoid duplication
                 self.reload_list()
+
+                # Bounds check for index
+                if self.slist:
+                    new_idx = min(idx, len(self.slist) - 1)
+                else:
+                    new_idx = 0
+
                 self["list"].setList([s.label for s in self.slist])
-                self["list"].moveToIndex(idx)
+                self["list"].moveToIndex(new_idx)
+
                 if not new_slot_name:
                     self.session.open(MessageBox, _("Slot name was reset to default."), MessageBox.TYPE_INFO, timeout=3)
             except Exception as e:  # pylint: disable=broad-except
