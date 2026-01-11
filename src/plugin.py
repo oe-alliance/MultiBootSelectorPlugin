@@ -11,7 +11,7 @@ try:
     from urllib.request import urlopen
 except ImportError:
     from urllib2 import urlopen
-from os.path import isfile
+from os import path, environ
 from subprocess import Popen, PIPE
 from re import match, escape, search, sub
 from collections import namedtuple
@@ -22,7 +22,7 @@ from time import localtime
 
 try:
     from Components.SystemInfo import BoxInfo
-    PLUGIN_LOAD = not BoxInfo.getItem("HasChkrootMultiboot")
+    PLUGIN_LOAD = True if "MBSP_FORCE_LOAD" in environ else not BoxInfo.getItem("canMultiBoot")
 except (ImportError, AttributeError):
     PLUGIN_LOAD = True
 from Components.ActionMap import ActionMap
@@ -134,7 +134,7 @@ class Scripts(Screen):
         output_lines = []
 
         try:
-            if not isfile(slotCmd):
+            if not path.isfile(slotCmd):
                 self.slist = [slotEntry(-1, _("Error: File '%s' is not available!") % slotCmd)]
             else:
                 process = Popen([slotCmd, "list"], stdout=PIPE, stderr=PIPE, universal_newlines=True)
@@ -216,7 +216,7 @@ class Scripts(Screen):
 
         rename_success = True
         try:
-            if isfile(slotCmd):
+            if path.isfile(slotCmd):
                 rename_cmd = "%s rename %s '%s'" % (slotCmd, slot.index, new_slot_name)
                 stderr = Popen(rename_cmd, shell=True, stdout=PIPE, stderr=PIPE, universal_newlines=True).communicate()[1]
                 if stderr:
