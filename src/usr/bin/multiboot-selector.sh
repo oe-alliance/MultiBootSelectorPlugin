@@ -167,27 +167,19 @@ rename_slot() {
 
         # --- perform reset or rename ---
         if [ -z "$new_name" ]; then
-            # RESET MODE
-            if [ -f "$distro_file_info" ]; then
-                sed -i '/^displaydistro=/d; /^imgversion=/d' "$distro_file_conf" 2>/dev/null
-                grep -q "^origin='multiboot-selector.sh'" "$distro_file_info" && rm "$distro_file_info" 2>/dev/null
-                echo "Cleaned displaydistro/imgversion from enigma.conf."
-            fi
-
+            # RESET — drop the override fields from enigma.conf and the empty marker info we own.
+            sed -i '/^displaydistro=/d; /^imgversion=/d; /^imgrevision=/d; /^compiledate=/d' "$distro_file_conf" 2>/dev/null
+            [ -f "$distro_file_info" ] && [ ! -s "$distro_file_info" ] && rm "$distro_file_info" 2>/dev/null
             echo "Reset name of slot $slot_number."
         else
-            # RENAME MODE
-            if [ -f "$distro_file_info" ]; then
-            local distro="${new_name% *}"                                  # everything before the last space
-            [[ "$new_name" == *" "* ]] && local version="${new_name##* }"  # only set version if there's a space
-                grep -q '^displaydistro=' "$distro_file_conf" 2>/dev/null && \
-                    sed -i "s|^displaydistro=.*|displaydistro='$distro'|" "$distro_file_conf" || \
-                    echo "displaydistro='$distro'" >> "$distro_file_conf"
-
-                grep -q '^imgversion=' "$distro_file_conf" 2>/dev/null && \
-                    sed -i "s|^imgversion=.*|imgversion='$version'|" "$distro_file_conf" || \
-                    echo "imgversion='$version'" >> "$distro_file_conf"
-            fi
+            # RENAME — touch empty enigma.info so e2's analyzeSlot takes the isfile(infoFile) branch and merges enigma.conf as override.
+            local distro="${new_name% *}"
+            local version=""
+            [[ "$new_name" == *" "* ]] && version="${new_name##* }"
+            [ ! -f "$distro_file_info" ] && : > "$distro_file_info"
+            sed -i '/^displaydistro=/d; /^imgversion=/d' "$distro_file_conf" 2>/dev/null
+            echo "displaydistro='$distro'" >> "$distro_file_conf"
+            echo "imgversion='$version'" >> "$distro_file_conf"
             echo "Renamed slot $slot_number to '$new_name'."
         fi
 
@@ -268,6 +260,16 @@ image_info() {
     local distro date e2date compiledate version pkg_version
     cmp -s "/boot/STARTUP" "/boot/$STARTUP_FILE" && current=' - Current' || current=''
 
+    # Migrate legacy plugin-written enigma.info (origin='multiboot-selector.sh') into enigma.conf and blank the info to the empty marker the override layer expects.
+    if [ -f "$distro_file_info" ] && grep -q "^origin='multiboot-selector.sh'" "$distro_file_info"; then
+        local mig_key mig_val
+        for mig_key in displaydistro imgversion imgrevision compiledate; do
+            mig_val=$(strip_quotes "$(grep "^${mig_key}=" "$distro_file_info" | cut -d '=' -f 2)")
+            grep -q "^${mig_key}=" "$distro_file_conf" 2>/dev/null || echo "${mig_key}='${mig_val}'" >> "$distro_file_conf"
+        done
+        : > "$distro_file_info"
+    fi
+
     if [ -f "$enigma_file_binary" ]; then
         e2date=$(strip_quotes "$(stat -c %y "$enigma_file_binary" 2>/dev/null | cut -d ' ' -f 1)")
         e2date="${e2date:-$(python -c "import os, time; print(time.strftime('%Y-%m-%d', time.localtime(os.path.getmtime('$enigma_file_binary'))))")}"
@@ -305,14 +307,13 @@ image_info() {
         version="${version:-$pkg_version}"
         IMAGE_INFO_RESULT="Slot $type: $(echo "$distro" "$version" | xargs) ($date)$current"
 
+        # Touch empty enigma.info as marker; pin derived fields in enigma.conf (override layer). Idempotent — only append keys that are missing.
         if [ ! -f "$distro_file_info" ]; then
-            {
-                printf "displaydistro='%s'\n" "$distro"
-                printf "imgversion='%s'\n" "$version"
-                printf "imgrevision='%s'\n" ""
-                printf "compiledate='%s'\n" "${date//-/}"
-                printf "origin='%s'\n" "multiboot-selector.sh"
-            } > "$distro_file_info"
+            : > "$distro_file_info"
+            grep -q '^displaydistro=' "$distro_file_conf" 2>/dev/null || echo "displaydistro='$distro'" >> "$distro_file_conf"
+            grep -q '^imgversion='    "$distro_file_conf" 2>/dev/null || echo "imgversion='$version'" >> "$distro_file_conf"
+            grep -q '^imgrevision='   "$distro_file_conf" 2>/dev/null || echo "imgrevision=''" >> "$distro_file_conf"
+            grep -q '^compiledate='   "$distro_file_conf" 2>/dev/null || echo "compiledate='${date//-/}'" >> "$distro_file_conf"
         fi
     else
         oem=$(basename "$STARTUP_FILE" | awk -F'_' '{print $NF}')
