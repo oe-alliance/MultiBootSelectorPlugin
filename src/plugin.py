@@ -67,21 +67,21 @@ def main(session, **kwargs):
 
 class Scripts(Screen):
     skin = """
-    <screen position="center,center" size="660,560" title="MultiBoot Selector">
-        <widget name="header" position="10,10" size="640,40" font="Regular;22" halign="center" valign="center" foregroundColor="#00e0ff" />
-        <widget name="list" position="10,60" size="640,415" scrollbarMode="showOnDemand" />
+    <screen position="center,center" size="900,560" title="MultiBoot Selector">
+        <widget name="header" position="10,10" size="880,40" font="Regular;22" halign="center" valign="center" foregroundColor="#00e0ff" />
+        <widget name="list" position="10,60" size="880,415" scrollbarMode="showOnDemand" />
 
-        <widget name="key_red_pixmap" pixmap="skin_default/buttons/red.png" position="10,510" size="150,40" scale="stretch" alphatest="on" />
-        <widget name="key_red" position="10,510" size="150,40" font="Regular;20" zPosition="1" halign="center" valign="center" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
+        <widget name="key_red_pixmap" pixmap="skin_default/buttons/red.png" position="10,510" size="210,40" scale="stretch" alphatest="on" />
+        <widget name="key_red" position="10,510" size="210,40" font="Regular;20" zPosition="1" halign="center" valign="center" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
 
-        <widget name="key_green_pixmap" pixmap="skin_default/buttons/green.png" position="173,510" size="150,40" scale="stretch" alphatest="on" />
-        <widget name="key_green" position="173,510" size="150,40" font="Regular;20" zPosition="1" halign="center" valign="center" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
+        <widget name="key_green_pixmap" pixmap="skin_default/buttons/green.png" position="233,510" size="210,40" scale="stretch" alphatest="on" />
+        <widget name="key_green" position="233,510" size="210,40" font="Regular;20" zPosition="1" halign="center" valign="center" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
 
-        <widget name="key_yellow_pixmap" pixmap="skin_default/buttons/yellow.png" position="336,510" size="150,40" scale="stretch" alphatest="on" />
-        <widget name="key_yellow" position="336,510" size="150,40" font="Regular;20" zPosition="1" halign="center" valign="center" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
+        <widget name="key_yellow_pixmap" pixmap="skin_default/buttons/yellow.png" position="456,510" size="210,40" scale="stretch" alphatest="on" />
+        <widget name="key_yellow" position="456,510" size="210,40" font="Regular;20" zPosition="1" halign="center" valign="center" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
 
-        <widget name="key_blue_pixmap" pixmap="skin_default/buttons/blue.png" position="499,510" size="150,40" scale="stretch" alphatest="on" />
-        <widget name="key_blue" position="499,510" size="150,40" font="Regular;20" zPosition="1" halign="center" valign="center" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
+        <widget name="key_blue_pixmap" pixmap="skin_default/buttons/blue.png" position="679,510" size="210,40" scale="stretch" alphatest="on" />
+        <widget name="key_blue" position="679,510" size="210,40" font="Regular;20" zPosition="1" halign="center" valign="center" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
     </screen>
     """
 
