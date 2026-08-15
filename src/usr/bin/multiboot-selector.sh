@@ -223,6 +223,14 @@ image_info() {
     STARTUP_FILE="${STARTUP_FILES[$idx]}"
     IMAGE_INFO_RESULT=""
 
+    # handle recovery slot without a rootfs (cmdline like 'bootcmd= recovery', no root=)
+    if [ "$STARTUP_FILE" = "STARTUP_RECOVERY" ] && [ "$ROOT_PARTITION" = "OEM" ]; then
+        local cur=''
+        cmp -s "/boot/STARTUP" "/boot/$STARTUP_FILE" && cur=' - Current'
+        IMAGE_INFO_RESULT="Slot FLASH: Recovery${cur}"
+        return
+    fi
+
     # --- mount only if changed ---
     if [ "$ROOT_PARTITION" != "$LAST_ROOT_PARTITION" ]; then
         unmount_slot "$LAST_TMPDIR"
