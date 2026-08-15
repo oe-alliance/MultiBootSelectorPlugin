@@ -127,6 +127,38 @@ strip_quotes() {
     echo "$1" | sed "s/^'//; s/'$//" | xargs
 }
 
+# Find the 0-based section index in /boot/bootconfig.txt for a given slot root.
+# Args: $1 = root device (e.g. /dev/mmcblk0p5, /dev/mmcblk1p3) or literal "recovery".
+# eMMC slots match 'mmc 1:<partno>' in the cmd= line, SD slots match '/kernel<partno>.img'.
+# Prints the index (or nothing if not found / bootconfig.txt missing).
+bootconfig_section_index() {
+    local root="$1" target="" mode=""
+    [ -f "/boot/bootconfig.txt" ] || return
+    if [ "$root" = "recovery" ]; then
+        mode="recovery"
+    else
+        target=$(echo "$root" | sed -n 's|.*p\([0-9]\+\)$|\1|p')
+        case "$root" in
+            */mmcblk0p*) mode="emmc" ;;
+            */mmcblk1p*) mode="sd" ;;
+        esac
+    fi
+    [ -z "$mode" ] && return
+    awk -v tgt="$target" -v mode="$mode" '
+        BEGIN { idx = -1 }
+        /^\[/ { idx++; next }
+        /^cmd=/ {
+            if (mode == "recovery") {
+                if ($0 ~ /imgread[[:space:]]+kernel[[:space:]]+recovery/) { print idx; exit }
+            } else if (mode == "emmc") {
+                if ($0 ~ "mmc 1:"tgt"[^0-9]") { print idx; exit }
+            } else if (mode == "sd") {
+                if ($0 ~ "/kernel"tgt"\\.img") { print idx; exit }
+            }
+        }
+    ' /boot/bootconfig.txt
+}
+
 rename_slot() {
     local slot_number="$1"
     local new_name="$2"
@@ -181,6 +213,30 @@ rename_slot() {
             echo "displaydistro='$distro'" >> "$distro_file_conf"
             echo "imgversion='$version'" >> "$distro_file_conf"
             echo "Renamed slot $slot_number to '$new_name'."
+        fi
+
+        # Sync the bootconfig.txt [Section] header (GPT only) using image_info()'s detection so the header matches the name the UI shows for this slot.
+        if [ "$MB_TYPE" = "gpt" ] && [ -f "/boot/bootconfig.txt" ]; then
+            local section_idx
+            section_idx=$(bootconfig_section_index "$ROOT")
+            if [ -n "$section_idx" ]; then
+                STARTUP_FILES=("$(basename "$FILE")")
+                ROOT_PARTITIONS=("$ROOT")
+                ROOTFS_TYPES=("$ROOTFSTYPE")
+                ROOT_SUBDIRS=("$ROOTSUBDIR")
+                LAST_ROOT_PARTITION="$ROOT"
+                LAST_TMPDIR="$tmpdir"
+                image_info 0 "$MB_TYPE"
+                local new_header
+                new_header=$(echo "$IMAGE_INFO_RESULT" | sed -E 's/^Slot [^:]+: //; s/ - Current$//')
+                if [ -n "$new_header" ]; then
+                    awk -v idx="$section_idx" -v name="$new_header" '
+                        BEGIN { cur = -1 }
+                        /^\[/ { cur++; if (cur == idx) { print "[" name "]"; next } }
+                        { print }
+                    ' /boot/bootconfig.txt > /tmp/bootconfig.new && mv /tmp/bootconfig.new /boot/bootconfig.txt
+                fi
+            fi
         fi
 
         unmount_slot "$tmpdir"
@@ -448,8 +504,20 @@ if [ ! "$MB_TYPE" == "gpt" ]; then
     cp "/boot/$STARTUP_FILE" "/boot/STARTUP"
 else
     if [ -f "/boot/bootconfig.txt" ]; then
-        echo "Setting default=$choice_index in /boot/bootconfig.txt..."
-        sed -i "s/^default=.*/default=$choice_index/" /boot/bootconfig.txt
+        # Look up the real section index in bootconfig.txt via the slot's root partition — falls back to $choice_index if the section can't be located.
+        if [ "${choices[$choice_index]}" = "R" ]; then
+            section_idx=$(bootconfig_section_index "recovery")
+        else
+            section_idx=$(bootconfig_section_index "$ROOT_PARTITION")
+        fi
+        [ -z "$section_idx" ] && section_idx="$choice_index"
+        echo "Setting default=$section_idx in /boot/bootconfig.txt..."
+        sed -i "s/^default=.*/default=$section_idx/" /boot/bootconfig.txt
+        # copy STARTUP_N to STARTUP
+        if [ "${choices[$choice_index]}" != "R" ]; then
+            echo "Copying /boot/$STARTUP_FILE to /boot/STARTUP..."
+            cp "/boot/$STARTUP_FILE" "/boot/STARTUP"
+        fi
     else
         echo "File '/boot/bootconfig.txt' for ${MB_TYPE} multiboot not found!"
         umount /boot 2>/dev/null
