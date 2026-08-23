@@ -20,6 +20,8 @@ from json import loads as json_loads, dumps as json_dumps
 from datetime import datetime
 from time import localtime
 
+from enigma import getDesktop
+
 try:
     from Components.SystemInfo import BoxInfo
     PLUGIN_LOAD = True if "MBSP_FORCE_LOAD" in environ else not BoxInfo.getItem("canMultiBoot")
@@ -66,26 +68,42 @@ def main(session, **kwargs):
 
 
 class Scripts(Screen):
+    # Geometry for a 720p desktop. Scaled at runtime in __init__ so the screen also fits FHD/WQHD skins,
+    # where the skin's own list font is bigger and would otherwise clip the slot names.
+    skinGeometry = {
+        "w": 900, "h": 560,
+        "pad": 10, "inner": 880,
+        "hdrH": 40, "hdrFont": 22,
+        "listY": 60, "listH": 415, "itemH": 30,
+        "btnY": 510, "btnW": 210, "btnH": 40, "btnFont": 20,
+        "btnX1": 10, "btnX2": 233, "btnX3": 456, "btnX4": 679,
+    }
+
     skin = """
-    <screen position="center,center" size="900,560" title="MultiBoot Selector">
-        <widget name="header" position="10,10" size="880,40" font="Regular;22" halign="center" valign="center" foregroundColor="#00e0ff" />
-        <widget name="list" position="10,60" size="880,415" scrollbarMode="showOnDemand" />
+    <screen position="center,center" size="%(w)d,%(h)d" title="MultiBoot Selector">
+        <widget name="header" position="%(pad)d,%(pad)d" size="%(inner)d,%(hdrH)d" font="Regular;%(hdrFont)d" halign="center" valign="center" foregroundColor="#00e0ff" />
+        <widget name="list" position="%(pad)d,%(listY)d" size="%(inner)d,%(listH)d" scrollbarMode="showOnDemand" />
 
-        <widget name="key_red_pixmap" pixmap="skin_default/buttons/red.png" position="10,510" size="210,40" scale="stretch" alphatest="on" />
-        <widget name="key_red" position="10,510" size="210,40" font="Regular;20" zPosition="1" halign="center" valign="center" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
+        <widget name="key_red_pixmap" pixmap="skin_default/buttons/red.png" position="%(btnX1)d,%(btnY)d" size="%(btnW)d,%(btnH)d" scale="stretch" alphatest="on" />
+        <widget name="key_red" position="%(btnX1)d,%(btnY)d" size="%(btnW)d,%(btnH)d" font="Regular;%(btnFont)d" zPosition="1" halign="center" valign="center" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
 
-        <widget name="key_green_pixmap" pixmap="skin_default/buttons/green.png" position="233,510" size="210,40" scale="stretch" alphatest="on" />
-        <widget name="key_green" position="233,510" size="210,40" font="Regular;20" zPosition="1" halign="center" valign="center" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
+        <widget name="key_green_pixmap" pixmap="skin_default/buttons/green.png" position="%(btnX2)d,%(btnY)d" size="%(btnW)d,%(btnH)d" scale="stretch" alphatest="on" />
+        <widget name="key_green" position="%(btnX2)d,%(btnY)d" size="%(btnW)d,%(btnH)d" font="Regular;%(btnFont)d" zPosition="1" halign="center" valign="center" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
 
-        <widget name="key_yellow_pixmap" pixmap="skin_default/buttons/yellow.png" position="456,510" size="210,40" scale="stretch" alphatest="on" />
-        <widget name="key_yellow" position="456,510" size="210,40" font="Regular;20" zPosition="1" halign="center" valign="center" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
+        <widget name="key_yellow_pixmap" pixmap="skin_default/buttons/yellow.png" position="%(btnX3)d,%(btnY)d" size="%(btnW)d,%(btnH)d" scale="stretch" alphatest="on" />
+        <widget name="key_yellow" position="%(btnX3)d,%(btnY)d" size="%(btnW)d,%(btnH)d" font="Regular;%(btnFont)d" zPosition="1" halign="center" valign="center" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
 
-        <widget name="key_blue_pixmap" pixmap="skin_default/buttons/blue.png" position="679,510" size="210,40" scale="stretch" alphatest="on" />
-        <widget name="key_blue" position="679,510" size="210,40" font="Regular;20" zPosition="1" halign="center" valign="center" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
+        <widget name="key_blue_pixmap" pixmap="skin_default/buttons/blue.png" position="%(btnX4)d,%(btnY)d" size="%(btnW)d,%(btnH)d" scale="stretch" alphatest="on" />
+        <widget name="key_blue" position="%(btnX4)d,%(btnY)d" size="%(btnW)d,%(btnH)d" font="Regular;%(btnFont)d" zPosition="1" halign="center" valign="center" transparent="1" shadowColor="black" shadowOffset="-2,-2" />
     </screen>
     """
 
     def __init__(self, session, args=None):
+        # getDesktop() is core enigma2 API, so this works on every image regardless of the skin engine's
+        # own scaling features. Must be set before Screen.__init__, which parses self.skin.
+        factor = getDesktop(0).size().height() / 720.0
+        geometry = dict((key, int(value * factor)) for key, value in Scripts.skinGeometry.items())
+        self.skin = Scripts.skin % geometry
         Screen.__init__(self, session)
         self.title = "Select Boot Slot - Version %s" % PV
         self["header"] = Label(_("Boot device not found!"))
@@ -97,7 +115,7 @@ class Scripts(Screen):
         self.reload_list()
         self["list"] = MenuList([entry.label for entry in self.slist])
         if hasattr(self["list"].l, "setItemHeight"):
-            self["list"].l.setItemHeight(30)
+            self["list"].l.setItemHeight(geometry["itemH"])
 
         self["key_red"] = Button(_("Cancel"))
         self["key_red_pixmap"] = Pixmap()
