@@ -20,7 +20,7 @@ from json import loads as json_loads, dumps as json_dumps
 from datetime import datetime
 from time import localtime
 
-from enigma import getDesktop
+from enigma import getDesktop, gFont
 
 try:
     from Components.SystemInfo import BoxInfo
@@ -74,7 +74,7 @@ class Scripts(Screen):
         "w": 900, "h": 560,
         "pad": 10, "inner": 880,
         "hdrH": 40, "hdrFont": 22,
-        "listY": 60, "listH": 415, "itemH": 30,
+        "listY": 60, "listH": 415, "itemH": 30, "listFont": 20,
         "btnY": 510, "btnW": 210, "btnH": 40, "btnFont": 20,
         "btnX1": 10, "btnX2": 233, "btnX3": 456, "btnX4": 679,
     }
@@ -102,12 +102,11 @@ class Scripts(Screen):
         # getDesktop() is core enigma2 API, so this works on every image regardless of the skin engine's
         # own scaling features. Must be set before Screen.__init__, which parses self.skin.
         factor = getDesktop(0).size().height() / 720.0
-        geometry = dict((key, int(value * factor)) for key, value in Scripts.skinGeometry.items())
-        self.skin = Scripts.skin % geometry
+        self.geometry = dict((key, int(value * factor)) for key, value in Scripts.skinGeometry.items())
+        self.skin = Scripts.skin % self.geometry
         Screen.__init__(self, session)
         self.title = "Select Boot Slot - Version %s" % PV
         self["header"] = Label(_("Boot device not found!"))
-        self.session = session
         self.jsonRelease = None
         self.newVersion = PV
         self.slist = []
@@ -115,7 +114,7 @@ class Scripts(Screen):
         self.reload_list()
         self["list"] = MenuList([entry.label for entry in self.slist])
         if hasattr(self["list"].l, "setItemHeight"):
-            self["list"].l.setItemHeight(geometry["itemH"])
+            self["list"].l.setItemHeight(self.geometry["itemH"])
 
         self["key_red"] = Button(_("Cancel"))
         self["key_red_pixmap"] = Pixmap()
@@ -180,6 +179,17 @@ class Scripts(Screen):
             self.slist = [slotEntry(-1, "Error: %s" % e)]
 
     def onLayoutFinished(self):
+        # font and item height otherwise come from the active skin, which is applied after __init__,
+        # so set them on the listbox instance here (the content-level setItemHeight in __init__ stays as fallback)
+        # guarded because the listbox API differs between images; a failure must not skip the setup below
+        try:
+            listbox = self["list"].instance
+            if hasattr(listbox, "setFont"):
+                listbox.setFont(gFont("Regular", self.geometry["listFont"]))
+            if hasattr(listbox, "setItemHeight"):
+                listbox.setItemHeight(self.geometry["itemH"])
+        except Exception:  # pylint: disable=broad-except
+            pass
         # select current running image in the list
         self["list"].moveToIndex(self.currentIndex)
         # reload button images
