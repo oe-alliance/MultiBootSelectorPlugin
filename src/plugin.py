@@ -20,7 +20,7 @@ from json import loads as json_loads, dumps as json_dumps
 from datetime import datetime
 from time import localtime
 
-from enigma import getDesktop, gFont
+from enigma import getDesktop, gFont, ePoint
 
 try:
     from Components.SystemInfo import BoxInfo
@@ -188,6 +188,17 @@ class Scripts(Screen):
                 listbox.setFont(gFont("Regular", self.geometry["listFont"]))
             if hasattr(listbox, "setItemHeight"):
                 listbox.setItemHeight(self.geometry["itemH"])
+        except Exception:  # pylint: disable=broad-except
+            pass
+        # position="center,center" only centers the client area, the title bar and borders of the window style
+        # are added outside of it, so the window sits too high. Center the whole window instead: move() takes
+        # client coordinates, so move to 0,0 first to read the decoration offset back from position().
+        try:
+            self.instance.move(ePoint(0, 0))
+            offset = self.instance.position()
+            size = self.instance.size()
+            desktop = getDesktop(0).size()
+            self.instance.move(ePoint((desktop.width() - size.width()) // 2 - offset.x(), (desktop.height() - size.height()) // 2 - offset.y()))
         except Exception:  # pylint: disable=broad-except
             pass
         # select current running image in the list
