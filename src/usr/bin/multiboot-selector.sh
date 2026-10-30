@@ -127,6 +127,17 @@ strip_quotes() {
     echo "$1" | sed "s/^'//; s/'$//" | xargs
 }
 
+# Print ' - Current' when the slot is the running one.
+# Args: $1 = root partition, $2 = STARTUP file name.
+# On GPT the boot menu may start another slot than STARTUP names, so the root of the running kernel decides there.
+current_marker() {
+    if [ "$MB_TYPE" = "gpt" ]; then
+        [ "$1" = "$(sed -n 's/.*root=\([^ ]*\).*/\1/p' /proc/cmdline)" ] && echo ' - Current'
+    else
+        cmp -s "/boot/STARTUP" "/boot/$2" && echo ' - Current'
+    fi
+}
+
 # Find the 0-based section index in /boot/bootconfig.txt for a given slot root.
 # Args: $1 = root device (e.g. /dev/mmcblk0p5, /dev/mmcblk1p3) or literal "recovery".
 # eMMC slots match 'mmc 1:<partno>' in the cmd= line, SD slots match '/kernel<partno>.img'.
@@ -281,9 +292,7 @@ image_info() {
 
     # handle recovery slot without a rootfs (cmdline like 'bootcmd= recovery', no root=)
     if [ "$STARTUP_FILE" = "STARTUP_RECOVERY" ] && [ "$ROOT_PARTITION" = "OEM" ]; then
-        local cur=''
-        cmp -s "/boot/STARTUP" "/boot/$STARTUP_FILE" && cur=' - Current'
-        IMAGE_INFO_RESULT="Slot FLASH: Recovery${cur}"
+        IMAGE_INFO_RESULT="Slot FLASH: Recovery$(current_marker "$ROOT_PARTITION" "$STARTUP_FILE")"
         return
     fi
 
@@ -322,7 +331,7 @@ image_info() {
     local distro_file_issue="$tmpdir$ROOT_SUBDIR/etc/issue"
     distro_file_status=$(echo "$tmpdir$ROOT_SUBDIR"/var/lib/{d,o}pkg/status)
     local distro date e2date compiledate version pkg_version
-    cmp -s "/boot/STARTUP" "/boot/$STARTUP_FILE" && current=' - Current' || current=''
+    current=$(current_marker "$ROOT_PARTITION" "$STARTUP_FILE")
 
     # Migrate legacy plugin-written enigma.info (origin='multiboot-selector.sh') into enigma.conf and blank the info to the empty marker the override layer expects.
     if [ -f "$distro_file_info" ] && grep -q "^origin='multiboot-selector.sh'" "$distro_file_info"; then
